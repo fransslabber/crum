@@ -1,6 +1,5 @@
-use num_traits::{Float, Num,Zero,One};
+use num_traits::{Float, PrimInt,Zero,One};
 use std::ops::{Add, AddAssign, Sub,SubAssign, Mul, MulAssign,Div,DivAssign,Neg,Rem,RemAssign};
-
 
 // Define a generic Complex structure
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -9,11 +8,10 @@ pub struct Complex<T> {
    imag: T,
 }
 
-
 // Implement the Zero trait for Complex<T>
 impl<T> Zero for Complex<T>
 where
-   T: Num + Float,
+   T: PrimInt + Float,
 {
    fn zero() -> Self {
       Self {
@@ -33,7 +31,7 @@ where
 // Implement the One trait for Complex<T>
 impl<T> One for Complex<T>
 where
-   T: Num + Float,
+   T: PrimInt + Float,
 {
    fn one() -> Self {
       Self {
@@ -53,7 +51,7 @@ where
 // Implement the + trait for Complex<T>
 impl<T> Add for Complex<T>
 where
-   T: Add<Output = T> + Num + Float,
+   T: Add<Output = T> + PrimInt + Float,
 {
    type Output = Self;
 
@@ -65,83 +63,73 @@ where
    }
 }
 
-// // Implement the `Rem` trait
-// impl<T> Rem for Complex<T>
-// where
-//     T: Copy
-//         + Add<Output = T>
-//         + Sub<Output = T>
-//         + Mul<Output = T>
-//         + Div<Output = T>
-//         + Rem<Output = T>
-//         + Into<f64>,
-// {
-//     type Output = Self;
+/// Wrapper for floating-point complex numbers
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FloatComplex<T: Float>(pub Complex<T>);
 
-//     fn rem(self, other: Self) -> Self::Output {
-//         // Compute the norm of the divisor
-//         let norm = other.norm_squared();
+/// Wrapper for integer complex numbers
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct IntegerComplex<T: PrimInt>(pub Complex<T>);
 
-//         // Compute the conjugate of the divisor
-//         let conjugate = other.conjugate();
 
-//         // Compute the quotient: q = (self * conjugate) / norm
-//         let q_real = ((self.real * conjugate.real - self.imag * conjugate.imag) / norm).into();
-//         let q_imag = ((self.real * conjugate.imag + self.imag * conjugate.real) / norm).into();
-
-//         // Round to the nearest integers for the quotient
-//         let rounded_real = q_real.round() as T;
-//         let rounded_imag = q_imag.round() as T;
-
-//         // Construct the Gaussian integer quotient
-//         let quotient = Self::new(rounded_real, rounded_imag);
-
-//         // Compute the remainder: r = self - q * other
-//         let product = Self {
-//             real: quotient.real * other.real - quotient.imag * other.imag,
-//             imag: quotient.real * other.imag + quotient.imag * other.real,
-//         };
-
-//         Self {
-//             real: self.real - product.real,
-//             imag: self.imag - product.imag,
-//         }
-//     }
-// }
-
-// Implement the % trait for Complex<T>
-impl<T> Rem for Complex<T>
+// Implement the % trait for Complex<T> T as Float
+impl<T> Rem for FloatComplex<T>
 where
-   T: Clone + Into<f64> + From<f64> + Float + Num
-   {
+   T: Float
+{
    type Output = Self;
-   
-   // Division with remainder
+
    fn rem(self, other: Self) -> Self {
-      let norm = other.norm();
-      let conjugate = other.conj();
+      let norm = other.0.norm();
+      let conjugate = other.0.conj();
 
       // Compute q = (self * conjugate) / norm
-      let real_part = ((self.real.clone() * conjugate.real.clone() - self.imag.clone() * conjugate.imag.clone()) / norm).into();
-      let imag_part = ((self.real.clone() * conjugate.imag.clone() + self.imag.clone() * conjugate.real.clone()) / norm).into();
+      let real_part = (self.0.real * conjugate.real - self.0.imag * conjugate.imag) / norm;
+      let imag_part = (self.0.real * conjugate.imag + self.0.imag * conjugate.real) / norm;
 
-      // Round to the nearest integers
+      // Round to nearest integers
       let rounded_real = real_part.round();
       let rounded_imag = imag_part.round();
 
-      let quotient = Self::new(rounded_real.into(), rounded_imag.into());
+      let quotient = Complex::new(rounded_real, rounded_imag);
 
-      // Compute the remainder: r = self - (quotient * other)
-      let product = Self::new(
-         quotient.real.clone() * other.real.clone() - quotient.imag.clone() * other.imag.clone(),
-         quotient.real.clone() * other.imag.clone() + quotient.imag.clone() * other.real.clone(),
+      let product = Complex::new(
+         quotient.real * other.0.real - quotient.imag * other.0.imag,
+         quotient.real * other.0.imag + quotient.imag * other.0.real,
       );
 
-      let remainder = Self::new(self.real.clone() - product.real.clone(), self.imag.clone() - product.imag.clone());
-
-      remainder
+      FloatComplex(Complex::new(
+         self.0.real - product.real,
+         self.0.imag - product.imag,
+      ))
    }
-   
+}
+
+impl<T> Rem for IntegerComplex<T>
+where
+   T: PrimInt + Neg<Output = T>,
+{
+   type Output = Self;
+
+   fn rem(self, other: Self) -> Self::Output {
+      let norm = other.0.real * other.0.real + other.0.imag * other.0.imag;
+      let conjugate = Complex::new(other.0.real, -other.0.imag);
+
+      let q_real = (self.0.real * conjugate.real - self.0.imag * conjugate.imag) / norm;
+      let q_imag = (self.0.real * conjugate.imag + self.0.imag * conjugate.real) / norm;
+
+      let quotient = Complex::new(q_real, q_imag);
+
+      let product = Complex::new(
+         quotient.real * other.0.real - quotient.imag * other.0.imag,
+         quotient.real * other.0.imag + quotient.imag * other.0.real,
+      );
+
+      IntegerComplex(Complex::new(
+         self.0.real - product.real,
+         self.0.imag - product.imag,
+      ))
+   }
 }
 
 // Implement the += trait for Complex<T>
@@ -211,7 +199,7 @@ where
 // Implement / z1 = a + bi,z2 = c + di then z1 / z2 = [(a * c + b * d) + (b * c - a * d)i] / (c² + d²)
 impl<T> Div for Complex<T>
 where
-   T: Num + Float + Clone
+   T: Div<Output= T> + Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Clone,
 {
    type Output = Self;
 
@@ -227,7 +215,7 @@ where
 // Implement *= trait for Complex<T>
 impl<T> DivAssign for Complex<T>
 where
-   T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Div<Output = T>+ Clone
+   T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Div<Output = T> + Clone
 {
    fn div_assign(&mut self, other: Self) {
       let denom = other.real.clone() * other.real.clone() + other.imag.clone() * other.imag.clone();
@@ -249,9 +237,9 @@ impl<T> Complex<T>
    // absolute value/modulus/hypotenuse/magnitude
    pub fn norm(&self) -> T 
    where
-      T: Float + Num
+      T: Clone + Add<Output = T> + Mul<Output = T>
    {      
-      self.real * self.real + self.imag * self.imag
+      self.real.clone() * self.real.clone() + self.imag.clone() * self.imag.clone()
    }
 
    // absolute value/modulus/hypotenuse/magnitude
@@ -279,7 +267,7 @@ impl<T> Complex<T>
 
    pub fn conj(&self) -> Self
       where
-         T: Neg<Output = T> + Num + Float + Clone,
+         T: Neg<Output = T> + Clone,
    {
       Self {
          real: self.real.clone(),
@@ -298,7 +286,7 @@ impl<T> Complex<T>
    // Returns a Complex<T> value from polar coords ( angle in radians )
    pub fn polar(magnitude: T,phase_angle: T ) -> Complex<T>
    where
-      T: Float + Num + Clone,
+      T: PrimInt + Float + Clone,
    {
       Complex { real: magnitude * phase_angle.cos(), imag: magnitude * phase_angle.sin()}
    }
@@ -315,7 +303,7 @@ impl<T> Complex<T>
    Returning "infinity" when the magnitude exceeds a certain threshold. */
    pub fn proj(&self) -> Self
       where
-         T: Float
+         T: PrimInt + Float + Clone,
    {
       let magnitude = self.hypot();
       let infinity = T::infinity();
@@ -335,7 +323,7 @@ impl<T> Complex<T>
    // Returns the phase angle (or angular component) of the complex number x, expressed in radians.  
    pub fn arg(&self) -> T
       where
-         T: Float
+         T: PrimInt + Float + Clone,
    {
       self.imag.clone().atan2(self.real.clone())
    }

@@ -1,23 +1,33 @@
 mod complex;
 mod cmatrix;
 
-use complex::Complex; // Import the Complex struct
+use complex::{Complex, IntegerComplex, FloatComplex}; // Import the Complex structs
 use cmatrix::Matrix;
 
 fn main() {
    // Example usage with i32
-   let mut c1 = Complex::new(6, 4 );
-   let c2 = Complex::new(3, 5 );
+   let c1 = FloatComplex(Complex::new(6.0, 4.0));
+   let c2 = FloatComplex(Complex::new(3.0, 5.0));
    // (6+4i)mod(3+5i) = -2+2i
    println!("c1 {:?} c2 {:?} c1 mod c2 {:?}", c1, c2, c1 % c2);
    
-   // let c3 = c1 * c2;
-   // c1 *= c2;
-   // let data = vec![Complex::new(1.0,9.0),Complex::new(2.0,10.0),Complex::new(3.0,11.0),Complex::new(4.0,12.0)];
-   // let m1 = Matrix::new(2, 2, data);
-   // let sldata = vec![Complex::new(5.0,9.0),Complex::new(6.0,10.0),Complex::new(7.0,11.0),Complex::new(8.0,12.0)];
-   // let m2 = Matrix::new_with_slice(2, 2, &sldata);
-   
-   // println!("m1: {:?} m2: {:?} Added {:?}", m1, m2, m1.clone() + m2.clone());
+   let c3 = IntegerComplex(Complex::new(6, 4));
+   let c4 = IntegerComplex(Complex::new(3, 5));
+   println!("c3 {:?} c4 {:?} c3 mod c4 {:?}", c3, c4, c3 % c4);
 
+   let m: Matrix<i32> = matrix!([
+         [1, 2, 3],
+         [4, 5, 6],
+         [7, 8, 9]
+   ]);
+
+  println!("{:?}", m);
+
+  // Use the matrix! macro to create a Matrix<f64>
+  let m_float: Matrix<f64> = matrix!([
+         [1.1, 2.2],
+         [3.3, 4.4]
+   ]);
+
+  println!("{:?}", m_float);
 }

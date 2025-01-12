@@ -1,5 +1,5 @@
 use num_traits::{Float, Num};
-use std::ops::{Add, AddAssign, Sub,SubAssign, Mul, MulAssign,Div,DivAssign,Neg};
+use std::ops::{Add, AddAssign, Sub,SubAssign, Mul, MulAssign,Div,DivAssign,Neg,Index,IndexMut};
 use std::vec::Vec;
 
 // Define a generic matrix structure
@@ -14,7 +14,7 @@ pub struct Matrix<T> {
 // Implement the + trait for Matrix<T>
 impl<T> Add for Matrix<T>
    where
-      T: Num + Clone + std::fmt::Debug,
+      T: Clone + Add<Output = T>,
    {
       type Output = Result<Self,&'static str>;
 
@@ -36,6 +36,43 @@ impl<T> Add for Matrix<T>
       }
    }
 }
+// // Implement the + trait for Matrix<T>
+// impl<T> Index<(u128,u128)> for Matrix<T>
+//    where
+//       T: Clone,
+//    {
+//       type Output = T;
+
+//       fn index(self, row, col) -> T {
+
+//       }
+//    }
+
+// // Implement the + trait for Matrix<T>
+// impl<T,Idx> IndexMut<Idx> for Matrix<T>
+//    where
+//       T: Clone + Add<Output = T>,
+//    {
+//       type Output = Result<Self,&'static str>;
+
+//       fn index_mut(self, other: Self) -> Result<Self, &'static str> {
+//       if self.cols == other.rows {
+//             let data = self
+//                .data
+//                .iter()
+//                .zip(other.data.iter())
+//                .map(|(a, b)| a.clone() + b.clone())
+//                .collect();
+//             Ok(Self {
+//                rows: self.rows,
+//                cols: self.cols,
+//                data,
+//             })
+//       } else {
+//             Err("Multiplicaton of matrices A*B requires A column dimension = B row dimension")
+//       }
+//    }
+// }
 
 // // Implement the += trait for Complex<T>
 // impl<T> AddAssign for Complex<T>
@@ -73,8 +110,8 @@ impl<T> Add for Matrix<T>
 //    }
 // }
 
-// // Implement * (a + bi) * (c + di) = (ac - bd) + (ad + bc)i
-// impl<T> Mul for Complex<T>
+// Implement * (a + bi) * (c + di) = (ac - bd) + (ad + bc)i
+// impl<T> Mul for Matrix<T>
 // where
 //    T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Clone
 // {
@@ -134,7 +171,7 @@ impl<T> Add for Matrix<T>
 // Implement standard functions for complex numbers
 impl<T: Clone> Matrix<T>
 {
-   // Constructor for a new complex number
+   // Constructor for a new matrix from Vec
    pub fn new(rows: u128, cols: u128, data: Vec<T> ) -> Self {
       let size = (rows * cols) as usize;
       assert!(
@@ -149,27 +186,35 @@ impl<T: Clone> Matrix<T>
       Matrix { rows, cols, data }
    }
 
-   pub fn new_with_slice(rows: u128, cols: u128, data: &[T]) -> Self {
-      // Validate that the provided slice length matches the matrix size
-      let size = (rows * cols) as usize;
-      assert!(
-         data.len() == size,
-          "The number of elements in the slice does not match rows * cols"
-      );
-      assert!(
-         size <= usize::MAX,
-         "The number of elements in the data Vec exceeds possible max size usize::MAX"
-      );
-
-      // Clone the slice into a Vec<T>
-      let data = data.to_vec();
-
-      Matrix { rows, cols, data }
-   }
-
-
 }
 
+#[macro_export]
+macro_rules! matrix {
+   // Match rows and columns
+   
+   ( $(  [$($x:expr),* ]   ),*) => {
+      {
+         // Collect all elements into a flat vector
+         let mut data = Vec::new();
+         let mut rows : u128 = 0;
+         let mut first_row_cols : usize = 0;
+         let mut is_first_row: bool = true;
+         $(
+            $(
+               rows += 1;
+               if is_first_row {
+                  first_row_cols = $x.len();
+                  is_first_row = false;
+               } else{
+                  assert_eq!(first_row_cols as usize, $x.len(), "All rows must have the same number of columns");
+               }           
+               data.extend($x);
+            )*
+         )*
+         Matrix::new(rows, first_row_cols as u128, data)
+      }
+   };
+}
 
 //    // absolute value/modulus/hypotenuse
 //    pub fn hypot(&self) -> T 
