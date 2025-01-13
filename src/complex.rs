@@ -1,4 +1,4 @@
-use num_traits::{Float, PrimInt,Zero,One};
+use num_traits::{Float, PrimInt,Zero,One,Num};
 use std::ops::{Add, AddAssign, Sub,SubAssign, Mul, MulAssign,Div,DivAssign,Neg,Rem,RemAssign};
 
 // Define a generic Complex structure
@@ -51,7 +51,7 @@ where
 // Implement the + trait for Complex<T>
 impl<T> Add for Complex<T>
 where
-   T: Add<Output = T> + PrimInt + Float,
+   T: Add<Output = T>
 {
    type Output = Self;
 
@@ -63,29 +63,20 @@ where
    }
 }
 
-/// Wrapper for floating-point complex numbers
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FloatComplex<T: Float>(pub Complex<T>);
-
-/// Wrapper for integer complex numbers
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct IntegerComplex<T: PrimInt>(pub Complex<T>);
-
-
 // Implement the % trait for Complex<T> T as Float
-impl<T> Rem for FloatComplex<T>
+impl<T> Rem for Complex<T>
 where
    T: Float
 {
    type Output = Self;
 
    fn rem(self, other: Self) -> Self {
-      let norm = other.0.norm();
-      let conjugate = other.0.conj();
+      let norm = other.norm();
+      let conjugate = other.conj();
 
       // Compute q = (self * conjugate) / norm
-      let real_part = (self.0.real * conjugate.real - self.0.imag * conjugate.imag) / norm;
-      let imag_part = (self.0.real * conjugate.imag + self.0.imag * conjugate.real) / norm;
+      let real_part = (self.real * conjugate.real - self.imag * conjugate.imag) / norm;
+      let imag_part = (self.real * conjugate.imag + self.imag * conjugate.real) / norm;
 
       // Round to nearest integers
       let rounded_real = real_part.round();
@@ -94,43 +85,17 @@ where
       let quotient = Complex::new(rounded_real, rounded_imag);
 
       let product = Complex::new(
-         quotient.real * other.0.real - quotient.imag * other.0.imag,
-         quotient.real * other.0.imag + quotient.imag * other.0.real,
+         quotient.real * other.real - quotient.imag * other.imag,
+         quotient.real * other.imag + quotient.imag * other.real,
       );
 
-      FloatComplex(Complex::new(
-         self.0.real - product.real,
-         self.0.imag - product.imag,
-      ))
+      Self{
+         real: self.real - product.real,
+         imag: self.imag - product.imag,
+      }
    }
 }
 
-impl<T> Rem for IntegerComplex<T>
-where
-   T: PrimInt + Neg<Output = T>,
-{
-   type Output = Self;
-
-   fn rem(self, other: Self) -> Self::Output {
-      let norm = other.0.real * other.0.real + other.0.imag * other.0.imag;
-      let conjugate = Complex::new(other.0.real, -other.0.imag);
-
-      let q_real = (self.0.real * conjugate.real - self.0.imag * conjugate.imag) / norm;
-      let q_imag = (self.0.real * conjugate.imag + self.0.imag * conjugate.real) / norm;
-
-      let quotient = Complex::new(q_real, q_imag);
-
-      let product = Complex::new(
-         quotient.real * other.0.real - quotient.imag * other.0.imag,
-         quotient.real * other.0.imag + quotient.imag * other.0.real,
-      );
-
-      IntegerComplex(Complex::new(
-         self.0.real - product.real,
-         self.0.imag - product.imag,
-      ))
-   }
-}
 
 // Implement the += trait for Complex<T>
 impl<T> AddAssign for Complex<T>
@@ -286,7 +251,7 @@ impl<T> Complex<T>
    // Returns a Complex<T> value from polar coords ( angle in radians )
    pub fn polar(magnitude: T,phase_angle: T ) -> Complex<T>
    where
-      T: PrimInt + Float + Clone,
+      T: Num + Float + Clone,
    {
       Complex { real: magnitude * phase_angle.cos(), imag: magnitude * phase_angle.sin()}
    }
@@ -303,7 +268,7 @@ impl<T> Complex<T>
    Returning "infinity" when the magnitude exceeds a certain threshold. */
    pub fn proj(&self) -> Self
       where
-         T: PrimInt + Float + Clone,
+         T: Float + Num + Clone,
    {
       let magnitude = self.hypot();
       let infinity = T::infinity();
@@ -323,7 +288,7 @@ impl<T> Complex<T>
    // Returns the phase angle (or angular component) of the complex number x, expressed in radians.  
    pub fn arg(&self) -> T
       where
-         T: PrimInt + Float + Clone,
+         T: Num + Float + Clone,
    {
       self.imag.clone().atan2(self.real.clone())
    }
