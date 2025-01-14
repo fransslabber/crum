@@ -53,13 +53,7 @@ fn main() {
    // Returns the phase angle (or angular component) of the complex number x, expressed in radians.
    println!("Phase angle c1 {:?} to {:?} radians", c1, c1.arg());
  
-   let m: Matrix<i32> = matrix!([
-         [1, 2, 3],
-         [4, 5, 6],
-         [7, 8, 9]
-   ]);
-
-   println!("\n\n{:?}", m);
+   
 
    // Use the matrix! macro to create a Matrix<f64>
    let mut m_complex: Matrix<Complex<f64>> = matrix!([
@@ -73,7 +67,29 @@ fn main() {
 
    println!("Index(2,1) {:?}", m_complex[(2,1)]);
 
-   println!("Row 2 {:?}", m_complex.row(2))
+   println!("Row 2 {:?}", m_complex.row(2));
 
+   println!("Col 2 {:?}", m_complex.col(2));
+
+   let m = matrix!([
+      [1.0, 2.0],
+      [3.0, 4.0]
+      ]);
+
+   let n = matrix!([
+      [1.0, 2.0, 7.0],
+      [3.0, 4.0, 8.0]
+      ]);
+
+   let m_mul = m*n.clone();
+   println!("Result: {:?}", m_mul.data());
+
+   println!("Complex Matrix Multiplication {:?}", m_complex.clone()*m_complex);
+
+   let o = matrix!([[Complex::new(4.6,2.9),Complex::new(6.6,7.3)]]);  // 1x2
+   let p = matrix!([[Complex::new(4.6,2.9)],[Complex::new(6.6,7.3)]]); // 2x1
+   println!("Sim Vector Dot {:?}", o.clone()*p);
+
+   println!("Scalar multiplication {:?}", n.mul_scalar(&3.0));
 
 }

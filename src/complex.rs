@@ -294,3 +294,18 @@ impl<T> Complex<T>
    }
 }
 
+use std::iter::Sum;
+
+impl<T> Sum for Complex<T>
+   where T: Add<Output = T> + Zero {
+   fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+      iter.fold(
+         Complex { real: T::zero(), imag: T::zero() },
+         |acc, x| Complex {
+               real: acc.real + x.real,
+               imag: acc.imag + x.imag,
+         },
+      )
+   }
+}
+

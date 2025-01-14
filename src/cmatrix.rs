@@ -78,14 +78,37 @@ impl<T: Clone> Matrix<T>
    }
 
    // Get nth col as Vec<T>
-   pub fn col(&self, idx: u128) -> &[T] {
-                        let d =&self
+   pub fn col(&self, idx: u128) -> Vec<T> {
+                        self
                         .data
                         .iter()                  // Create an iterator over the vector
-                        .skip(idx as usize)                 // Skip the first 3 elements
-                        .step_by(self.cols as usize)              // Take every 5th element
-                        .collect();
-                     d
+                        .skip((idx - 1) as usize)                 // Skip the first elements
+                        .step_by(self.cols as usize)              // Take every nth element
+                        .cloned()
+                        .collect()
+                     
+   }
+
+   // Get data Vec 
+   pub fn data(&self) -> Vec<T> {
+      self.data.clone()
+   }
+
+   // Get scalar multiplication
+   pub fn mul_scalar(&self, num: &T) -> Self 
+      where T: Mul<Output = T> + Clone 
+      {
+      let data: Vec<T> = self
+      .data
+      .iter()                  // Create an iterator over the vector
+      .map(|x| x.clone()*num.clone() )
+      .collect();
+
+      Self {
+         rows:self.rows,
+         cols: self.cols,
+         data: data
+      }
    }
 }
 
@@ -116,27 +139,66 @@ macro_rules! matrix {
    };
 }
 
-// impl<T> Mul for Matrix<T>
-//    where
-//       T: Clone + Mul<Output = T>,
-// {
-//    type Output = Result<Self,&'static str>;
+//
+// Matrix Multiplication
+//
 
-//    fn mul(self, other: Self) -> Result<Self, &'static str> {
-//       if self.cols == other.rows {
-//             let data = self
-//                .data
-//                .iter()
-//                .zip(other.data.iter())
-//                .map(|(a, b)| a.clone() + b.clone())
-//                .collect();
-//             Ok(Self {
-//                rows: self.rows,
-//                cols: self.cols,
-//                data,
-//             })
-//       } else {
-//             Err("Multiplication requires LHS col dimension equal RHS row dimension")
-//       }
-//    }
-// }
+// Define a custom skip iterator
+pub struct SkipIter<'a, T> {
+   vec: &'a [T],      // Reference to the slice (borrowed from the Vec)
+   index: usize,      // Current index
+   step: usize,       // Step/offset to skip
+}
+
+impl<'a, T> SkipIter<'a, T> {
+   // Create a new SkipIter
+   pub fn new(vec: &'a Vec<T>, start: usize, step: usize) -> Self {
+      Self {
+           vec: &vec[start..], // Slice starting at `start` index
+           index: 0,           // Initialize current index
+           step,               // Store the step size
+      }
+   }
+}
+
+// Implement the Iterator trait for SkipIter
+impl<'a, T> Iterator for SkipIter<'a, T> {
+   type Item = &'a T;
+
+   fn next(&mut self) -> Option<Self::Item> {
+      if self.index >= self.vec.len() {
+           None // Stop iteration if we're out of bounds
+      } else {
+           let item = &self.vec[self.index]; // Get the current item
+           self.index += self.step;          // Move to the next step
+         Some(item)
+      }
+   }
+}
+
+impl<T> Mul for Matrix<T>
+   where
+      T: Copy + Mul<Output = T>+ Add<Output = T> + std::iter::Sum
+{
+   type Output = Self;
+
+   fn mul(self, other: Self) -> Self {
+      assert_eq!(self.cols, other.rows, "Multiplication requires LHS col dimension equal RHS row dimension");
+
+      let mut result_vec: Vec<T> = Vec::new();
+      for row_idx in 1..=self.rows{
+         for col_idx in 1..=other.cols {
+            let current_row = (&self.data[(self.cols*(row_idx-1)) as usize..((self.cols*(row_idx-1)) + self.cols) as usize]).to_vec();
+            let iter = SkipIter::new(&other.data, (col_idx - 1) as usize, other.cols as usize);
+            let current_col = iter.map(|&x| x).collect::<Vec<T>>();
+            result_vec.push(current_row.into_iter().zip(current_col.into_iter()).map(|(x, y)| x * y).sum());
+         }
+      }
+
+      Self {
+         rows: self.rows,
+         cols: other.cols,
+         data: result_vec
+      }
+   }
+}
