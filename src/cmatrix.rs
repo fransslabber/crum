@@ -1,9 +1,13 @@
+use crate::complex::Complex;
 use std::ops::{Add,Index,IndexMut,Mul};
 use std::vec::Vec;
 
+
+
+
 // Define a generic matrix structure
 // with data stored as row dominant
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Matrix<T> {
    rows: u128,
    cols: u128,
@@ -52,6 +56,25 @@ impl<T> IndexMut<(u128,u128)> for Matrix<T>
       }
    }
 
+impl<T> PartialEq for Matrix<T>
+   where
+   T: std::cmp::PartialEq
+{
+   fn eq(&self, other: &Self) -> bool {
+      assert_eq!((self.rows,self.cols),(other.rows,other.cols),"Comparison of matrices requires the same dimensions.");
+      
+      let data:Vec<bool> = self
+            .data
+            .iter()
+            .zip(other.data.iter())
+            .map(|(a, b)| a == b)
+            .collect();
+      
+      !data.iter().any(|&x| !x)
+         
+   }
+}
+
 
 
 // Implement standard functions for complex numbers
@@ -94,50 +117,119 @@ impl<T: Clone> Matrix<T>
       self.data.clone()
    }
 
-   // Get scalar multiplication
-   pub fn mul_scalar(&self, num: &T) -> Self 
-      where T: Mul<Output = T> + Clone 
-      {
-      let data: Vec<T> = self
-      .data
-      .iter()                  // Create an iterator over the vector
-      .map(|x| x.clone()*num.clone() )
-      .collect();
+   // Transpose
+   pub fn trans(self) -> Self {   
+
+      let mut result_vec: Vec<T> = Vec::with_capacity((self.rows*self.cols) as usize);
+      for row_idx in 1..=self.cols{
+         let iter = SkipIter::new(&self.data, (row_idx - 1) as usize, self.cols as usize);
+         let current_row:Vec<T> = iter.map(|x| x.clone()).collect();
+         result_vec.extend(current_row);
+      }
 
       Self {
-         rows:self.rows,
-         cols: self.cols,
-         data: data
+         rows: self.cols,
+         cols: self.rows,
+         data: result_vec
+      }
+   }
+
+
+}
+
+// Complex Matrix Specializations
+impl<T: Clone + std::ops::Neg<Output = T>> Matrix<Complex<T>> where Matrix<Complex<T>>: PartialEq
+{
+   
+   // Complex Conjugate
+   pub fn conj(self) -> Self {
+      Self {
+         rows: self.cols,
+         cols: self.rows,
+         data: self.data.iter().map(|x| Complex::new(x.real(),-x.imag())).collect()
+      }
+   }
+
+  // Hermitian/Self-adjoint - Charles Hermite 1855
+   pub fn is_hermitian(self) -> bool {
+      if self.clone().trans().conj() == self {
+         true
+      } else {
+         false
       }
    }
 }
 
 #[macro_export]
+#[allow(unused_assignments)]
 macro_rules! matrix {
    // Match rows and columns   
    ( $(  [$($x:expr),* ]   ),*) => {
       {
-         // Collect all elements into a flat vector
          let mut data = Vec::new();
          let mut rows : u128 = 0;
          let mut first_row_cols : usize = 0;
+         let mut row_cols: usize = 0;
          let mut is_first_row: bool = true;
          $(
+            rows += 1;            
             $(
-               rows += 1;
                if is_first_row {
-                  first_row_cols = $x.len();
-                  is_first_row = false;
-               } else{
-                  assert_eq!(first_row_cols as usize, $x.len(), "All rows must have the same number of columns");
-               }           
-               data.extend($x);
+                  first_row_cols += 1;
+               } else {
+                  row_cols += 1;
+               }
+               data.push($x);
+               //println!("{:?}",$x);
             )*
+            if is_first_row {
+               is_first_row = false;
+            } else{
+               assert_eq!(first_row_cols as usize, row_cols, "All rows must have the same number of columns");
+               row_cols = 0;
+            }       
          )*
+         //println!("Rows {} Cols {}", rows, first_row_cols);
          Matrix::new(rows, first_row_cols as u128, data)
       }
    };
+   
+   // ( $rows:expr; $cols:expr; $val:expr; $t:ty ) => {{
+   //          let data = Vec<$t>::from_element($val,$rows * $cols);
+   //          //println!("Rows {} Cols {}", rows, first_row_cols);
+   //          Matrix::new($rows, $cols, data)
+   // }};
 }
+
+
+
+
+// #[macro_export]
+// macro_rules! matrix {
+//    // Match rows and columns   
+//    ( $(  [$($x:expr),* ]   ),*) => {
+//       {
+//          // Collect all elements into a flat vector
+//          let mut data = Vec::new();
+//          let mut rows : u128 = 0;
+//          let mut first_row_cols : usize = 0;
+//          let mut is_first_row: bool = true;
+//          $(
+//             $(
+//                rows += 1;
+//                if is_first_row {
+//                   first_row_cols = $x.len();
+//                   is_first_row = false;
+//                } else{
+//                   assert_eq!(first_row_cols as usize, $x.len(), "All rows must have the same number of columns");
+//                }           
+//                data.extend($x);
+//             )*
+//          )*
+//          Matrix::new(rows, first_row_cols as u128, data)
+//       }
+//    };
+// }
 
 //
 // Matrix Multiplication
@@ -202,3 +294,50 @@ impl<T> Mul for Matrix<T>
       }
    }
 }
+
+// impl<T> Display for Matrix<T>
+//    where
+//       T: Copy + Mul<Output = T>+ Add<Output = T> + std::iter::Sum
+// {
+//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//       //write!(f, "({}, {})", self.longitude, self.latitude)
+
+//       for row_idx in 1..=self.rows{
+//          for col_idx in 1..=other.cols {
+//           }
+//       }
+//    }
+// }
+
+impl<T> Mul<T> for Matrix<T>
+   where
+      T: Copy + Mul<Output = T>
+{
+   type Output = Self;
+
+   fn mul(self, other: T) -> Self {
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: self.data.iter().map(|&x| x*other).collect()
+      }
+   }
+}
+
+
+impl<T> Add<T> for Matrix<T>
+   where
+      T: Copy + Add<Output = T>
+{
+   type Output = Self;
+
+   fn add(self, other: T) -> Self {
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: self.data.iter().map(|&x| x+other).collect()
+      }
+   }
+}
+
+// Transpose, Complex Conjugation , is_symmetric, determinant, eigenvalues?

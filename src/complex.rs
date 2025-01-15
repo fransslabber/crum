@@ -285,6 +285,21 @@ impl<T> Complex<T>
       }
    }
 
+   pub fn sqrt(&self) -> Self
+   where 
+   T:Float + Num
+   + PartialOrd + Copy
+   {
+      let magnitude = self.hypot();
+      let two = T::from(2.0);
+
+      let real_part = ((magnitude + self.real) / two.unwrap()).sqrt();
+      let imag_sign = if self.imag < T::from(0.0).unwrap() { -T::from(1.0).unwrap() } else { T::from(1.0).unwrap() };
+      let imag_part = imag_sign * ((magnitude - self.real) / two.unwrap()).sqrt();
+
+      Self::new(real_part, imag_part)      
+   }   
+
    // Returns the phase angle (or angular component) of the complex number x, expressed in radians.  
    pub fn arg(&self) -> T
       where
