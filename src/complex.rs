@@ -1,9 +1,11 @@
-use num_traits::{Float, PrimInt,Zero,One,Num};
-use std::ops::{Add, AddAssign, Sub,SubAssign, Mul, MulAssign,Div,DivAssign,Neg,Rem,RemAssign};
+use num_traits::{Float,Num,Zero,One};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::fmt::Display;
 
 // Define a generic Complex structure
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Complex<T> {
+pub struct Complex<T>
+{
    real: T,
    imag: T,
 }
@@ -11,7 +13,7 @@ pub struct Complex<T> {
 // Implement the Zero trait for Complex<T>
 impl<T> Zero for Complex<T>
 where
-   T: PrimInt + Float,
+   T: Zero + PartialEq,
 {
    fn zero() -> Self {
       Self {
@@ -31,7 +33,7 @@ where
 // Implement the One trait for Complex<T>
 impl<T> One for Complex<T>
 where
-   T: PrimInt + Float,
+   T: Clone + Sub<Output = T> + One + Zero + PartialEq,
 {
    fn one() -> Self {
       Self {
@@ -63,54 +65,21 @@ where
    }
 }
 
-// Implement the % trait for Complex<T> T as Float
-impl<T> Rem for Complex<T>
-where
-   T: Float
-{
-   type Output = Self;
-
-   fn rem(self, other: Self) -> Self {
-      let norm = other.norm();
-      let conjugate = other.conj();
-
-      // Compute q = (self * conjugate) / norm
-      let real_part = (self.real * conjugate.real - self.imag * conjugate.imag) / norm;
-      let imag_part = (self.real * conjugate.imag + self.imag * conjugate.real) / norm;
-
-      // Round to nearest integers
-      let rounded_real = real_part.round();
-      let rounded_imag = imag_part.round();
-
-      let quotient = Complex::new(rounded_real, rounded_imag);
-
-      let product = Complex::new(
-         quotient.real * other.real - quotient.imag * other.imag,
-         quotient.real * other.imag + quotient.imag * other.real,
-      );
-
-      Self{
-         real: self.real - product.real,
-         imag: self.imag - product.imag,
-      }
-   }
-}
-
-
 // Implement the += trait for Complex<T>
 impl<T> AddAssign for Complex<T>
 where
-   T: AddAssign,
+   T: AddAssign
 {
    fn add_assign(&mut self, other: Self) {
       self.real += other.real;
       self.imag += other.imag;
    }
 }
+
 // Implement the - trait for Complex<T>
 impl<T> Sub for Complex<T>
 where
-   T: Sub<Output = T>,
+   T: Sub<Output = T>
 {
    type Output = Self;
 
@@ -125,7 +94,7 @@ where
 // Implement the -= trait for Complex<T>
 impl<T> SubAssign for Complex<T>
 where
-   T: SubAssign,
+   T: SubAssign
 {
    fn sub_assign(&mut self, other: Self) {
       self.real -= other.real;
@@ -136,7 +105,7 @@ where
 // Implement * (a + bi) * (c + di) = (ac - bd) + (ad + bc)i
 impl<T> Mul for Complex<T>
 where
-   T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Clone
+   T: Clone + Mul<Output = T> + Add<Output = T> + Sub<Output = T>
 {
    type Output = Self;
 
@@ -151,7 +120,7 @@ where
 // Implement *= trait for Complex<T>
 impl<T> MulAssign for Complex<T>
 where
-   T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Clone,
+   T: Clone + Mul<Output = T> + Add<Output = T> + Sub<Output = T>
 {
    fn mul_assign(&mut self, other: Self) {
       let real = self.real.clone() * other.real.clone() - self.imag.clone() * other.imag.clone();
@@ -164,7 +133,7 @@ where
 // Implement / z1 = a + bi,z2 = c + di then z1 / z2 = [(a * c + b * d) + (b * c - a * d)i] / (c² + d²)
 impl<T> Div for Complex<T>
 where
-   T: Div<Output= T> + Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Clone,
+   T: Clone + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + Div<Output = T> 
 {
    type Output = Self;
 
@@ -180,7 +149,7 @@ where
 // Implement *= trait for Complex<T>
 impl<T> DivAssign for Complex<T>
 where
-   T: Mul<Output = T> + Sub<Output = T> + Add<Output = T> + Div<Output = T> + Clone
+   T: Clone + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + Div<Output = T> 
 {
    fn div_assign(&mut self, other: Self) {
       let denom = other.real.clone() * other.real.clone() + other.imag.clone() * other.imag.clone();
@@ -192,47 +161,36 @@ where
 }
 
 // Implement standard functions for complex numbers
-impl<T> Complex<T>
+impl<T: Clone> Complex<T>
 {
    // Constructor for a new complex number
-   pub fn new(real: T, imag: T) -> Self {
+   pub fn new(real: T, imag: T) -> Self 
+   {
       Self { real, imag }
    }
 
    // absolute value/modulus/hypotenuse/magnitude
-   pub fn norm(&self) -> T 
+   pub fn norm(&self) -> T
    where
-      T: Clone + Add<Output = T> + Mul<Output = T>
+      T: Mul<Output = T> + Add<Output = T> 
    {      
       self.real.clone() * self.real.clone() + self.imag.clone() * self.imag.clone()
    }
 
-   // absolute value/modulus/hypotenuse/magnitude
-   pub fn hypot(&self) -> T 
-      where
-         T: Float + Clone
-   {      
-      self.real.clone().hypot(self.imag.clone())
-   }
-
    // 
    pub fn real(&self) -> T
-      where
-         T: Clone    
    {
       self.real.clone()
    }
 
    pub fn imag(&self) -> T
-      where
-         T: Clone        
    {
       self.imag.clone()
    }
 
    pub fn conj(&self) -> Self
-      where
-         T: Neg<Output = T> + Clone,
+   where
+   T: Neg<Output = T>
    {
       Self {
          real: self.real.clone(),
@@ -240,9 +198,19 @@ impl<T> Complex<T>
       }
    }
 
+
+}
+
+// Implement standard functions for complex numbers
+impl<T: Clone + Float> Complex<T>
+{
+   // absolute value/modulus/hypotenuse/magnitude
+   pub fn hypot(&self) -> T 
+   {      
+      self.real.clone().hypot(self.imag.clone())
+   }
+
    pub fn degrees_to_radians(degrees: T) -> T
-      where
-         T: Float,
    {
       let pi = T::from(std::f64::consts::PI).unwrap(); // Convert PI to type T
       degrees * pi / T::from(180.0).unwrap()
@@ -250,8 +218,6 @@ impl<T> Complex<T>
 
    // Returns a Complex<T> value from polar coords ( angle in radians )
    pub fn polar(magnitude: T,phase_angle: T ) -> Complex<T>
-   where
-      T: Num + Float + Clone,
    {
       Complex { real: magnitude * phase_angle.cos(), imag: magnitude * phase_angle.sin()}
    }
@@ -267,8 +233,6 @@ impl<T> Complex<T>
    Returning zz as is if it is finite.
    Returning "infinity" when the magnitude exceeds a certain threshold. */
    pub fn proj(&self) -> Self
-      where
-         T: Float + Num + Clone,
    {
       let magnitude = self.hypot();
       let infinity = T::infinity();
@@ -286,9 +250,6 @@ impl<T> Complex<T>
    }
 
    pub fn sqrt(&self) -> Self
-   where 
-   T:Float + Num
-   + PartialOrd + Copy
    {
       let magnitude = self.hypot();
       let two = T::from(2.0);
@@ -302,11 +263,10 @@ impl<T> Complex<T>
 
    // Returns the phase angle (or angular component) of the complex number x, expressed in radians.  
    pub fn arg(&self) -> T
-      where
-         T: Num + Float + Clone,
    {
       self.imag.clone().atan2(self.real.clone())
    }
+
 }
 
 use std::iter::Sum;
@@ -323,4 +283,17 @@ impl<T> Sum for Complex<T>
       )
    }
 }
+
+
+impl<T: Display + Clone + num_traits::Signed + std::cmp::PartialOrd> Display for Complex<T> {
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      if self.imag < T::zero() {
+         write!(f, "{}-i{}", self.real.clone(), num_traits::abs(self.imag.clone())).expect("Not Written"); 
+      } else {
+         write!(f, "{}+i{}", self.real.clone(),self.imag.clone()).expect("Not Written");
+      }
+      Ok(())
+   }
+}
+
 

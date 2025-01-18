@@ -55,14 +55,25 @@ fn main() {
  
    
 
-   //Use the matrix! macro to create a Matrix<f64>
-   let m_complex: Matrix<Complex<i32>> = matrix![
-         [Complex::new(0, 0), Complex::new(6, -4), Complex::new(3, -4)],
-         [Complex::new(6, 4), Complex::new(1, 0), Complex::new(2, -5)],
-         [Complex::new(3, 4), Complex::new(2, 5), Complex::new(2, 0)]
-   ];
+   //Use the matrix! macro to create a Matrix<Complex<f64>>
+   let m_complex_f  = matrix![[Complex::new(0.0, 0.0), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+                                                   [Complex::new(6.1, 4.0), Complex::new(1.0, 0.0), Complex::new(2.0, -5.0)],
+                                                   [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 0.0)]];
+
+   println!("Complex Real {}", m_complex_f);
+
+   let m_complex_i  = matrix![[Complex::new(0, 0), Complex::new(6, -4), Complex::new(3, -4)],
+                                                   [Complex::new(6, 4), Complex::new(1, 0), Complex::new(2, -5)],
+                                                   [Complex::new(3, 4), Complex::new(2, 5), Complex::new(2, 0)]];
    
-   println!("Is Hermitian {:?}", m_complex.is_hermitian());
+   println!("Complex Integer {}", m_complex_i);
+
+   
+   println!("Is Hermitian {:?}", m_complex_f.clone().is_hermitian());
+   println!("Is Hermitian {:?}", m_complex_i.clone().is_hermitian());
+   let (q,r) = m_complex_f.qr_decomp_gs(); 
+
+   //println!("QR decomposition Q {} R{}",q,r );
 
    // println!("{:?} \nIndex(2,1) {:?}", m_complex, m_complex[(2,1)]);
 

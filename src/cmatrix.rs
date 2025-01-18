@@ -1,14 +1,59 @@
 use crate::complex::Complex;
-use std::ops::{Add,Index,IndexMut,Mul};
+use std::ops::{Add,Index,IndexMut,Mul,Sub, Div};
+use std::process::Output;
 use std::vec::Vec;
+use std::fmt::Display;
+use num_traits::{Zero,Float};
 
+//
+// Some linear alg operations on a vector required
+//
+/// Compute the dot product of two vectors
+fn dot_product<T>(v1: &Vec<T>, v2: &Vec<T>) -> T
+where
+   T: Copy + Zero + Mul<Output = T>
+{
+   v1.iter().zip(v2).fold(T::zero(), |acc, (&x, &y)| acc + x * y)
+}
 
+/// Compute the 2-norm of a vector
+fn col_norm<T>(v: &Vec<T>) -> T
+where
+   T: Copy + Float
+{
+   let sum = v.iter().fold(T::zero(), |acc, &x| acc + x * x);
+   sum.sqrt()
+}
 
+/// Compute the scaler * vector
+fn scalar_mul<T>(v: &Vec<T>, a:T) -> Vec<T>
+where
+   T: Clone + Mul<Output = T>
+{
+   v.iter().map(|x| a.clone() * x.clone()).collect()
+}
+
+/// Compute the vector / scalar
+fn scalar_div<T>(v: &Vec<T>, a:T) -> Vec<T>
+where
+   T: Clone + Div<Output = T>
+{
+   v.iter().map(|x| x.clone()/a.clone()).collect()
+}
+
+/// Compute vector - vector
+fn vector_sub<T>(v1: &Vec<T>, v2: &Vec<T>) -> Vec<T>
+where
+   T: Copy + Sub<Output = T>
+{
+   v1.iter().zip(v2).map(|(&x,&y)| x - y).collect()
+}
 
 // Define a generic matrix structure
 // with data stored as row dominant
 #[derive(Debug, Clone)]
-pub struct Matrix<T> {
+pub struct Matrix<T> 
+{
    rows: u128,
    cols: u128,
    data: Vec<T>
@@ -40,6 +85,22 @@ impl<T> Add for Matrix<T>
    }
 }
 
+impl<T> Add<T> for Matrix<T>
+   where
+      T: Copy + Add<Output = T>,
+{
+   type Output = Self;
+
+   fn add(self, other: T) -> Self {
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: self.data.iter().map(|&x| x+other).collect()
+      }
+   }
+}
+
+//Implement a = matrix[(i,j)] index and matrix[(i,j,)] = a
 impl<T> Index<(u128,u128)> for Matrix<T>
    {
       type Output = T;
@@ -56,9 +117,10 @@ impl<T> IndexMut<(u128,u128)> for Matrix<T>
       }
    }
 
+// Implement == comparison for matrices
 impl<T> PartialEq for Matrix<T>
    where
-   T: std::cmp::PartialEq
+   T: PartialEq
 {
    fn eq(&self, other: &Self) -> bool {
       assert_eq!((self.rows,self.cols),(other.rows,other.cols),"Comparison of matrices requires the same dimensions.");
@@ -81,7 +143,9 @@ impl<T> PartialEq for Matrix<T>
 impl<T: Clone> Matrix<T>
 {
    // Constructor for a new matrix from Vec
-   pub fn new(rows: u128, cols: u128, data: Vec<T> ) -> Self {
+   pub fn new(rows: u128, cols: u128, data: Vec<T> ) -> Self
+   where
+   T: Clone {
       let size = (rows * cols) as usize;
       assert!(
          data.len() == size,
@@ -112,6 +176,31 @@ impl<T: Clone> Matrix<T>
                      
    }
 
+   // Get nth col as Vec<T>
+   pub fn col_set(self, idx: u128, col: Vec<T>) -> Self
+   where 
+      {
+      let mut data= self.data;      
+      let vec_iter = data
+      .iter_mut()  // mutable iterator over the vector
+      .skip((idx - 1) as usize)  // Skip the first elements
+      .step_by(self.cols as usize);
+      
+      let mut index:usize = 0;
+      for x in vec_iter{
+         let temp = &col[index];
+         *x = col[index].clone();
+         index += 1;
+      }
+
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: data.to_vec()
+      }
+   
+}
+
    // Get data Vec 
    pub fn data(&self) -> Vec<T> {
       self.data.clone()
@@ -133,12 +222,55 @@ impl<T: Clone> Matrix<T>
          data: result_vec
       }
    }
+}
+
+
+
+impl<T> Matrix<T> {
+   // QR Decomposition - Gram-Schmidt
+   pub fn qr_decomp_gs(&self) ->(Self,Self)
+      where
+         T:Copy + Zero + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + Div<Output = T>
+         {
+            let mut q = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
+            let mut r = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
+            // For each column in self
+            // Define vector as a n x 1 matrix
+            for i in 1..=self.cols {
+               let mut col_i = self.col(i);
+
+               // Orthogonalize the current column against all preceding columns
+               for j in 1..=i {
+                  let col_j = self.col(j);
+                  let r_ji = dot_product(&col_j, &col_i);
+
+                  r[(j,i)] = r_ji; 
+                  
+                  col_i = vector_sub(&col_j,&scalar_mul(&col_j,r_ji));
+
+               }
+
+               // Normalize column
+               let norm = col_norm(&col_i);
+               r[(i,i)] = norm; 
+               col_i = scalar_div(&col_i,norm);
+            
+               // set as ith column of Q matrix
+               q = q.clone().col_set(i, col_i);
+            }
+            (q,r)
+         }
+
 
 
 }
 
+
 // Complex Matrix Specializations
-impl<T: Clone + std::ops::Neg<Output = T>> Matrix<Complex<T>> where Matrix<Complex<T>>: PartialEq
+impl<T> Matrix<Complex<T>>
+   where
+      Matrix<Complex<T>>: PartialEq,
+      T: Clone + std::ops::Neg<Output = T>
 {
    
    // Complex Conjugate
@@ -150,7 +282,7 @@ impl<T: Clone + std::ops::Neg<Output = T>> Matrix<Complex<T>> where Matrix<Compl
       }
    }
 
-  // Hermitian/Self-adjoint - Charles Hermite 1855
+   // Hermitian/Self-adjoint - Charles Hermite 1855
    pub fn is_hermitian(self) -> bool {
       if self.clone().trans().conj() == self {
          true
@@ -158,6 +290,7 @@ impl<T: Clone + std::ops::Neg<Output = T>> Matrix<Complex<T>> where Matrix<Compl
          false
       }
    }
+
 }
 
 #[macro_export]
@@ -166,7 +299,7 @@ macro_rules! matrix {
    // Match rows and columns   
    ( $(  [$($x:expr),* ]   ),*) => {
       {
-         let mut data = Vec::new();
+         let mut data = Vec::<_>::new();
          let mut rows : u128 = 0;
          let mut first_row_cols : usize = 0;
          let mut row_cols: usize = 0;
@@ -179,7 +312,7 @@ macro_rules! matrix {
                } else {
                   row_cols += 1;
                }
-               data.push($x);
+               data.push($x);               
                //println!("{:?}",$x);
             )*
             if is_first_row {
@@ -189,9 +322,8 @@ macro_rules! matrix {
                row_cols = 0;
             }       
          )*
-         //println!("Rows {} Cols {}", rows, first_row_cols);
-         Matrix::new(rows, first_row_cols as u128, data)
-      }
+         Matrix::new(rows, first_row_cols as u128, data)  
+       }
    };
    
    // ( $rows:expr; $cols:expr; $val:expr; $t:ty ) => {{
@@ -201,38 +333,8 @@ macro_rules! matrix {
    // }};
 }
 
-
-
-
-// #[macro_export]
-// macro_rules! matrix {
-//    // Match rows and columns   
-//    ( $(  [$($x:expr),* ]   ),*) => {
-//       {
-//          // Collect all elements into a flat vector
-//          let mut data = Vec::new();
-//          let mut rows : u128 = 0;
-//          let mut first_row_cols : usize = 0;
-//          let mut is_first_row: bool = true;
-//          $(
-//             $(
-//                rows += 1;
-//                if is_first_row {
-//                   first_row_cols = $x.len();
-//                   is_first_row = false;
-//                } else{
-//                   assert_eq!(first_row_cols as usize, $x.len(), "All rows must have the same number of columns");
-//                }           
-//                data.extend($x);
-//             )*
-//          )*
-//          Matrix::new(rows, first_row_cols as u128, data)
-//       }
-//    };
-// }
-
 //
-// Matrix Multiplication
+// Matrix Multiplication : matrix * matrix, matrix * scalar
 //
 
 // Define a custom skip iterator
@@ -270,7 +372,7 @@ impl<'a, T> Iterator for SkipIter<'a, T> {
 
 impl<T> Mul for Matrix<T>
    where
-      T: Copy + Mul<Output = T>+ Add<Output = T> + std::iter::Sum
+      T: Copy + std::iter::Sum + Mul<Output = T>
 {
    type Output = Self;
 
@@ -295,23 +397,9 @@ impl<T> Mul for Matrix<T>
    }
 }
 
-// impl<T> Display for Matrix<T>
-//    where
-//       T: Copy + Mul<Output = T>+ Add<Output = T> + std::iter::Sum
-// {
-//    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//       //write!(f, "({}, {})", self.longitude, self.latitude)
-
-//       for row_idx in 1..=self.rows{
-//          for col_idx in 1..=other.cols {
-//           }
-//       }
-//    }
-// }
-
 impl<T> Mul<T> for Matrix<T>
-   where
-      T: Copy + Mul<Output = T>
+where 
+   T: Copy + Mul<Output = T>
 {
    type Output = Self;
 
@@ -324,20 +412,23 @@ impl<T> Mul<T> for Matrix<T>
    }
 }
 
-
-impl<T> Add<T> for Matrix<T>
-   where
-      T: Copy + Add<Output = T>
-{
-   type Output = Self;
-
-   fn add(self, other: T) -> Self {
-      Self {
-         rows: self.rows,
-         cols: self.cols,
-         data: self.data.iter().map(|&x| x+other).collect()
+// Display a matrix sensibly
+impl<T: Display +Clone> Display for Matrix<T> {
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+      write!(f, "\n[").expect("Not Written");
+      for row_idx in 1..=self.rows{         
+         write!(f, "[").expect("Not Written");
+         for col_idx in 1..=self.cols {
+            write!(f, "\t{}", self[(row_idx,col_idx)]).expect("Not Written");
+         }
+         if row_idx == self.rows {
+            write!(f, "\t]").expect("Not Written");
+         } else {
+            write!(f, "\t]\n").expect("Not Written");
+         }
+         
       }
+      write!(f, "]").expect("Not Written");
+      Ok(())
    }
 }
-
-// Transpose, Complex Conjugation , is_symmetric, determinant, eigenvalues?
