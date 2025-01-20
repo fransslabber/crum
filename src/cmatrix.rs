@@ -1,6 +1,5 @@
 use crate::complex::Complex;
 use std::ops::{Add,Index,IndexMut,Mul,Sub, Div};
-use std::process::Output;
 use std::vec::Vec;
 use std::fmt::Display;
 use num_traits::{Zero,Float};
@@ -230,7 +229,7 @@ impl<T> Matrix<T> {
    // QR Decomposition - Gram-Schmidt
    pub fn qr_decomp_gs(&self) ->(Self,Self)
       where
-         T:Copy + Zero + Mul<Output = T> + Add<Output = T> + Sub<Output = T> + Div<Output = T>
+         T:Copy + Zero + Float
          {
             let mut q = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
             let mut r = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
@@ -270,7 +269,7 @@ impl<T> Matrix<T> {
 impl<T> Matrix<Complex<T>>
    where
       Matrix<Complex<T>>: PartialEq,
-      T: Clone + std::ops::Neg<Output = T>
+      T: Clone + Float + std::ops::Neg<Output = T>
 {
    
    // Complex Conjugate
@@ -319,7 +318,6 @@ macro_rules! matrix {
                is_first_row = false;
             } else{
                assert_eq!(first_row_cols as usize, row_cols, "All rows must have the same number of columns");
-               row_cols = 0;
             }       
          )*
          Matrix::new(rows, first_row_cols as u128, data)  

@@ -1,6 +1,7 @@
-use num_traits::{Float,One,Zero};
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use num_traits::{Float, Num, NumCast, One, Signed, ToPrimitive, Zero};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,Rem};
 use std::fmt::Display;
+use std::iter::Sum;
 
 // Define a generic Complex structure
 #[derive(Debug, Clone, Copy, PartialEq,PartialOrd)]
@@ -9,6 +10,10 @@ pub struct Complex<T>
    real: T,
    imag: T,
 }
+
+/////////////////////////////////////////////////////////////////////////////////////////
+/// Implement One,Zero,Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign for Complex<T>
+///  
 
 // Implement the Zero trait for Complex<T>
 impl<T> Zero for Complex<T>
@@ -160,7 +165,9 @@ where
    }
 }
 
-// Implement standard functions for complex numbers
+/////////////////////////////////////////////////////////////////////////////////////////
+/// Standard Functions new,norm, magnitude,real,imag,conj for Complex<T>
+/// 
 impl<T> Complex<T>
 where 
  T: Float
@@ -202,24 +209,6 @@ where
       }
    }
 
-
-}
-
-// Implement standard functions for complex numbers
-impl<T: Clone + Float> Complex<T>
-{
-   // absolute value/modulus/hypotenuse/magnitude
-   pub fn hypot(&self) -> T 
-   {      
-      self.real.clone().hypot(self.imag.clone())
-   }
-
-   // pub fn degrees_to_radians(degrees: T) -> T
-   // {
-   //    let pi = T::from(std::f64::consts::PI).unwrap(); // Convert PI to type T
-   //    degrees * pi / T::from(180.0).unwrap()
-   // }
-
    // Returns a Complex<T> value from polar coords ( angle in radians )
    pub fn polar(magnitude: T,phase_angle: T ) -> Complex<T>
    {
@@ -238,7 +227,7 @@ impl<T: Clone + Float> Complex<T>
    Returning "infinity" when the magnitude exceeds a certain threshold. */
    pub fn proj(&self) -> Self
    {
-      let magnitude = self.hypot();
+      let magnitude = self.magnitude();
       let infinity = T::infinity();
 
       if magnitude.is_infinite() {
@@ -255,10 +244,14 @@ impl<T: Clone + Float> Complex<T>
 
 }
 
-// Implement Float for Complex<T>
+/////////////////////////////////////////////////////////////////////////////////////////
+/// Implement Float for Complex<T>
+/// 
+
 impl<T> Float for Complex<T>
 where
-   T: Float,
+   T: Float + Num + std::convert::From<f64>,
+   f64: From<T>
 {
    fn nan() -> Self {
       Self::new(T::nan(), T::nan())
@@ -363,7 +356,7 @@ where
 
    fn sqrt(self) -> Self {
       let mag = self.magnitude().sqrt();
-      let angle = self.imag.atan2(self.real) / T::from(2.0).unwrap();
+      let angle = self.imag.atan2(self.real) / <T as NumCast>::from(2.0).unwrap();
       Self::new(mag * angle.cos(), mag * angle.sin())
    }
 
@@ -545,9 +538,85 @@ impl<T> Neg for Complex<T>
    }
 }
 
+impl<T> NumCast for Complex<T>
+where
+   T: NumCast + Zero + Float + ToPrimitive,
+{
+   fn from<U: num_traits::ToPrimitive>(n: U) -> Option<Self> {
+      // Cast the input to type T using NumCast
+      T::from(n).map(|real| Complex::new(real, T::zero()))
+   }
+}
+
+impl<T> ToPrimitive for Complex<T>
+where
+   T: NumCast + Zero + Float + ToPrimitive,
+{
+   fn to_i64(&self) -> Option<i64> {
+      todo!()
+   }
+   
+   fn to_u64(&self) -> Option<u64> {
+      todo!()
+   }
+}
+
+/// Implement the % trait for Complex<T>
+impl<T> Rem for Complex<T>
+where
+   T: Clone + Into<f64> + From<f64> + Float + Num
+   {
+   type Output = Self;
+   
+   // Division with remainder
+   fn rem(self, other: Self) -> Self {
+      let norm = other.norm();
+      let conjugate = other.conj();
+
+      // Compute q = (self * conjugate) / norm
+      let real_part = ((self.real.clone() * conjugate.real.clone() - self.imag.clone() * conjugate.imag.clone()) / norm).into();
+      let imag_part = ((self.real.clone() * conjugate.imag.clone() + self.imag.clone() * conjugate.real.clone()) / norm).into();
+
+      // Round to the nearest integers
+      let rounded_real = real_part.round();
+      let rounded_imag = imag_part.round();
+
+      let quotient = Self::new(rounded_real.into(), rounded_imag.into());
+
+      // Compute the remainder: r = self - (quotient * other)
+      let product = Self::new(
+         quotient.real.clone() * other.real.clone() - quotient.imag.clone() * other.imag.clone(),
+         quotient.real.clone() * other.imag.clone() + quotient.imag.clone() * other.real.clone(),
+      );
+
+      let remainder = Self::new(self.real.clone() - product.real.clone(), self.imag.clone() - product.imag.clone());
+
+      remainder
+   }
+   
+}
 
 
-use std::iter::Sum;
+// Implement `Num` for `Complex<T>`
+impl<T> Num for Complex<T>
+where
+   T: Float + Num + Copy + std::convert::From<f64>,
+   f64: From<T>,
+{
+   type FromStrRadixErr = T::FromStrRadixErr;
+
+   fn from_str_radix(s: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+      // Parse a string in the form "a+bj" or "a-bj"
+      let parts: Vec<&str> = s.split(|c| c == '+' || c == '-').collect();
+      let real = T::from_str_radix(parts[0], radix)?;
+      let imag = if s.contains('-') {
+         -T::from_str_radix(parts[1], radix)?
+      } else {
+         T::from_str_radix(parts[1], radix)?
+      };
+      Ok(Self::new(real, imag))
+   }
+}
 
 impl<T> Sum for Complex<T>
    where T: Add<Output = T> + Zero {
@@ -563,12 +632,12 @@ impl<T> Sum for Complex<T>
 }
 
 
-impl<T: Display + Clone + num_traits::Signed + std::cmp::PartialOrd> Display for Complex<T> {
+impl<T: Display + Clone + Signed + PartialOrd> Display for Complex<T> {
    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       if self.imag < T::zero() {
-         write!(f, "{}-i{}", self.real.clone(), num_traits::abs(self.imag.clone())).expect("Not Written"); 
+         write!(f, "{}-i{}", format!("{:5.2}",self.real.clone()), format!("{:5.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
       } else {
-         write!(f, "{}+i{}", self.real.clone(),self.imag.clone()).expect("Not Written");
+         write!(f, "{}+i{}", format!("{:5.2}",self.real.clone()),format!("{:5.2}",self.imag.clone())).expect("Not Written");
       }
       Ok(())
    }

@@ -62,18 +62,20 @@ fn main() {
 
    println!("Complex Real {}", m_complex_f);
 
-   let m_complex_i  = matrix![[Complex::new(0, 0), Complex::new(6, -4), Complex::new(3, -4)],
-                                                   [Complex::new(6, 4), Complex::new(1, 0), Complex::new(2, -5)],
-                                                   [Complex::new(3, 4), Complex::new(2, 5), Complex::new(2, 0)]];
+   // let m_complex_i  = matrix![[Complex::new(0, 0), Complex::new(6, -4), Complex::new(3, -4)],
+   //                                                 [Complex::new(6, 4), Complex::new(1, 0), Complex::new(2, -5)],
+   //                                                 [Complex::new(3, 4), Complex::new(2, 5), Complex::new(2, 0)]];
    
-   println!("Complex Integer {}", m_complex_i);
+   //println!("Complex Integer {}", m_complex_i);
 
    
    println!("Is Hermitian {:?}", m_complex_f.clone().is_hermitian());
-   println!("Is Hermitian {:?}", m_complex_i.clone().is_hermitian());
+   //println!("Is Hermitian {:?}", m_complex_i.clone().is_hermitian());
    let (q,r) = m_complex_f.qr_decomp_gs(); 
 
-   //println!("QR decomposition Q {} R{}",q,r );
+   println!("QR decomposition \n\nQ:\n\n{}\n\nR:\n\n{}",q,r );
+
+   println!("QR Recombine \n\nQR:\n\n{}",q*r );
 
    // println!("{:?} \nIndex(2,1) {:?}", m_complex, m_complex[(2,1)]);
 
