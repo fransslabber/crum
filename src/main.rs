@@ -1,6 +1,8 @@
 mod complex;
 mod cmatrix;
 
+use std::convert::identity;
+
 use complex::Complex; // Import the Complex structs
 use cmatrix::Matrix;
 
@@ -56,11 +58,38 @@ fn main() {
    
 
    //Use the matrix! macro to create a Matrix<Complex<f64>>
-   let m_complex_f  = matrix![[Complex::new(0.0, 0.0), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
-                                                   [Complex::new(6.1, 4.0), Complex::new(1.0, 0.0), Complex::new(2.0, -5.0)],
-                                                   [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 0.0)]];
+   // let m_complex_f  = matrix![[Complex::new(0.0, 0.0), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+   //                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 0.0), Complex::new(2.0, -5.0)],
+   //                                                 [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 0.0)]];
 
-   println!("Complex Real {}", m_complex_f);
+   // println!("Complex Real {} Diag {:?}", m_complex_f, m_complex_f.diag());
+
+
+
+
+
+   
+
+   let CHT = Matrix::<Complex<f64>>::householder_transform(vec![Complex::new(6.1, 4.0),
+               Complex::new(1.0, 0.0), Complex::new(2.0, -5.0),Complex::new(3.0, 4.0), Complex::new(2.0, 5.0),
+               Complex::new(2.0, 0.0)]);
+   
+   let X = matrix![[Complex::new(6.1, 4.0)],
+                                          [ Complex::new(1.0, 0.0)], 
+                                          [Complex::new(2.0, -5.0)],
+                                          [Complex::new(3.0, 4.0)], 
+                                          [Complex::new(2.0, 5.0)], 
+                                          [Complex::new(2.0, 0.0)]];
+
+   println!("CHT {} \nX {} \nCHT*X {}",CHT.clone(),X.clone(), CHT*X );
+
+
+
+
+
+   // let m_identity_4_4 = Matrix::<Complex<f64>>::identity(4);
+
+   // println!("4x4 Complex Identity {} Check {}", m_identity_4_4, m_identity_4_4.is_identity());
 
    // let m_complex_i  = matrix![[Complex::new(0, 0), Complex::new(6, -4), Complex::new(3, -4)],
    //                                                 [Complex::new(6, 4), Complex::new(1, 0), Complex::new(2, -5)],
@@ -69,13 +98,13 @@ fn main() {
    //println!("Complex Integer {}", m_complex_i);
 
    
-   println!("Is Hermitian {:?}", m_complex_f.clone().is_hermitian());
+   //println!("Is Hermitian {:?}", m_complex_f.clone().is_hermitian());
    //println!("Is Hermitian {:?}", m_complex_i.clone().is_hermitian());
-   let (q,r) = m_complex_f.qr_decomp_gs(); 
+   //let (q,r) = m_complex_f.qr_decomp_gs(); 
 
-   println!("QR decomposition \n\nQ:\n\n{}\n\nR:\n\n{}",q,r );
+   // println!("QR decomposition \n\nQ:\n\n{}\n\nR:\n\n{}",q,r );
 
-   println!("QR Recombine \n\nQR:\n\n{}",q*r );
+   // println!("QR Recombine \n\nQR:\n\n{}",q*r );
 
    // println!("{:?} \nIndex(2,1) {:?}", m_complex, m_complex[(2,1)]);
 
@@ -110,10 +139,10 @@ fn main() {
 
    //let mut m_complex_rep: Matrix<Complex<f64>> = matrix!(3;3; Complex::new(6.0, 4.0); Complex::<f64> );
 
-   let n = matrix![
-      [1.0, 2.0, 7.0],
-      [3.0, 4.0, 8.0]];
+   // let n = matrix![
+   //    [1.0, 2.0, 7.0],
+   //    [3.0, 4.0, 8.0]];
 
-   println!("transpose {:?}", n.trans());
+   // println!("transpose {:?}", n.trans());
 
 }

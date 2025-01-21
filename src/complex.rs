@@ -250,7 +250,7 @@ where
 
 impl<T> Float for Complex<T>
 where
-   T: Float + Num + std::convert::From<f64>,
+   T: Float + Num + From<f64>,
    f64: From<T>
 {
    fn nan() -> Self {

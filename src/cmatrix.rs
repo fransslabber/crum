@@ -1,8 +1,9 @@
 use crate::complex::Complex;
+use std::convert::identity;
 use std::ops::{Add,Index,IndexMut,Mul,Sub, Div};
 use std::vec::Vec;
-use std::fmt::Display;
-use num_traits::{Zero,Float};
+use std::fmt::{Debug, Display};
+use num_traits::{zero, Float, One, Zero};
 
 //
 // Some linear alg operations on a vector required
@@ -24,12 +25,41 @@ where
    sum.sqrt()
 }
 
+
+   // norm of x of degree two = ||x||2 = ( x1 x∗1 + . . . + xk x∗k ).sqrt
+   pub fn norm_2<T>(vec: &Vec<Complex<T>>) -> Complex<T>
+   where
+      T: Float + From<f64>,
+      f64: From<T>
+   {
+      let sum = vec.iter().fold(Complex::<T>::zero(), |acc, x| acc + (*x) * x.conj());
+      sum.sqrt()
+   }
+
+
 /// Compute the scaler * vector
 fn scalar_mul<T>(v: &Vec<T>, a:T) -> Vec<T>
 where
    T: Clone + Mul<Output = T>
 {
    v.iter().map(|x| a.clone() * x.clone()).collect()
+}
+
+// Compute col vector * row vector = square matrix
+fn cvec_rvec<T>(v1: &Vec<T>, v2: &Vec<T>) -> Matrix<T> 
+where 
+   T: Clone + Zero + Float
+{
+   assert_eq!(v1.len(),v2.len(), "Vectors must have same dimensions.");
+
+   let mut data = vec![T::zero() ; v1.len()*v1.len()];
+   for (i,colvec) in v1.iter().enumerate() {
+      for (j,rowvec) in v2.iter().enumerate() {
+         data[(v1.len()*i) + j ] = colvec.clone() * rowvec.clone();
+      }
+
+   }
+   Matrix::<T>::new(v1.len() as u128,v1.len() as u128,data)
 }
 
 /// Compute the vector / scalar
@@ -48,6 +78,13 @@ where
    v1.iter().zip(v2).map(|(&x,&y)| x - y).collect()
 }
 
+/// Compute vector - vector
+fn vector_add<T>(v1: &Vec<T>, v2: &Vec<T>) -> Vec<T>
+where
+   T: Copy + Add<Output = T>
+{
+   v1.iter().zip(v2).map(|(&x,&y)| x + y).collect()
+}
 // Define a generic matrix structure
 // with data stored as row dominant
 #[derive(Debug, Clone)]
@@ -84,17 +121,28 @@ impl<T> Add for Matrix<T>
    }
 }
 
-impl<T> Add<T> for Matrix<T>
+// Implement the + trait for Matrix<T>
+impl<T> Sub for Matrix<T>
    where
-      T: Copy + Add<Output = T>,
-{
-   type Output = Self;
+      T: Clone + Sub<Output = T>,
+   {
+      type Output = Result<Self,&'static str>;
 
-   fn add(self, other: T) -> Self {
-      Self {
-         rows: self.rows,
-         cols: self.cols,
-         data: self.data.iter().map(|&x| x+other).collect()
+      fn sub(self, other: Self) -> Result<Self, &'static str> {
+      if self.rows == other.rows && self.cols == other.cols {
+            let data = self
+               .data
+               .iter()
+               .zip(other.data.iter())
+               .map(|(a, b)| a.clone() - b.clone())
+               .collect();
+            Ok(Self {
+               rows: self.rows,
+               cols: self.cols,
+               data,
+            })
+      } else {
+            Err("Addition requires matrices of the same dimensions")
       }
    }
 }
@@ -139,7 +187,7 @@ impl<T> PartialEq for Matrix<T>
 
 
 // Implement standard functions for complex numbers
-impl<T: Clone> Matrix<T>
+impl<T: Clone + Copy> Matrix<T>
 {
    // Constructor for a new matrix from Vec
    pub fn new(rows: u128, cols: u128, data: Vec<T> ) -> Self
@@ -174,6 +222,45 @@ impl<T: Clone> Matrix<T>
                         .collect()
                      
    }
+
+   // Get diagonal as Vec<T>
+   pub fn diag(&self) -> Vec<T> {
+
+      assert_eq!(self.cols, self.rows, "Matrix must be square.");
+
+      let mut counter: usize = 0;
+      let mut data:Vec<T> = Vec::new();
+      for (index,val) in self.data.iter().enumerate() {
+         if index == (counter * (self.cols as usize) + counter) {
+            data.push(*val);
+            counter += 1;
+         }
+      }  
+      data
+   }
+
+   pub fn identity(dimen: usize) -> Self
+   where 
+      T: Zero + One      
+   {
+      let mut identity = Matrix::new(dimen as u128,dimen as u128, vec![T::zero(); dimen*dimen]);
+      let mut counter: usize = 0;
+      for (index,val) in identity.data.iter_mut().enumerate() {
+         if index == (counter * dimen + counter) {
+            *val = T::one();
+            counter += 1;
+         }
+      }  
+      identity
+   }
+
+   pub fn is_identity(&self) -> bool
+   where 
+      T: One + PartialEq
+   {
+      (self.diag()).iter().all(|&x| x == T::one())
+   }
+
 
    // Get nth col as Vec<T>
    pub fn col_set(self, idx: u128, col: Vec<T>) -> Self
@@ -260,8 +347,6 @@ impl<T> Matrix<T> {
             (q,r)
          }
 
-
-
 }
 
 
@@ -271,8 +356,11 @@ impl<T> Matrix<Complex<T>>
       Matrix<Complex<T>>: PartialEq,
       T: Clone + Float + std::ops::Neg<Output = T>
 {
+   pub fn vec_conj(v: Vec<Complex<T>>) -> Vec<Complex<T>> {
+      v.iter().map(|x| Complex::new(x.real(),-x.imag())).collect()
+   }
    
-   // Complex Conjugate
+   // Matrix Complex Conjugate
    pub fn conj(self) -> Self {
       Self {
          rows: self.cols,
@@ -289,6 +377,42 @@ impl<T> Matrix<Complex<T>>
          false
       }
    }
+
+   // Householder Transform for Complex Matrices (CHT)
+   /* */
+   pub fn householder_transform(x: Vec<Complex<T>>) -> Self
+      where
+         T:Copy + Zero + Float + From<f64> + Debug,
+         f64: From<T> + Mul<T>
+         {
+            //println!("x {:?}", x);
+            /* When the elements of the matrix are complex numbers, 
+            it is denoted the Complex Householder Transform (CHT).
+            The CHT is applied to a column vector x to zero out all
+            the elements except the first one. */
+            let I = Matrix::<Complex<T>>::identity(x.len());
+            let x_norm_2 = norm_2(&x);
+            let exp_jtheta_x1 = x[0]/(x[0]*x[0].conj()).sqrt();
+            //let mut e1 = vec![Complex::<T>::zero();x.len()*x.len()];
+            //e1[0] = Complex::<T>::one();
+            let mut u = x.clone();
+            u[0] = x[0] + (exp_jtheta_x1 * x_norm_2);            
+            //let u_other = vector_add(&x,&scalar_mul(&e1,exp_jtheta_x1 * x_norm_2));
+            //println!("u {:?} \notheru {:?}",u,u_other);
+            let uh = Matrix::<Complex<T>>::vec_conj(u.clone());
+            //println!("uh {:?}", uh);
+            let uh_u: Complex<T> = dot_product(&uh, &u);
+            //println!("uh_u {:?}", uh_u);
+            let uh_u_f64 = f64::from(uh_u.real());
+
+            let u_uh: Matrix<Complex<T>> = cvec_rvec(&u,&uh);
+            let u_uh_multipled_data:Vec<Complex<T>> = u_uh.data.iter().map(|x| Complex::<T>::new((Into::<T>::into(2.0)/uh_u.real()) * x.real(), (Into::<T>::into(2.0)/uh_u.real()) * x.imag())).collect();
+            let U_Uh = Matrix::new(x.len()as u128,x.len() as u128, u_uh_multipled_data);
+            let CHT = I - U_Uh;      
+
+            CHT.unwrap()
+         }
+
 
 }
 
@@ -318,6 +442,7 @@ macro_rules! matrix {
                is_first_row = false;
             } else{
                assert_eq!(first_row_cols as usize, row_cols, "All rows must have the same number of columns");
+               row_cols = 0;
             }       
          )*
          Matrix::new(rows, first_row_cols as u128, data)  
