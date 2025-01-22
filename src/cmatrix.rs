@@ -1,6 +1,7 @@
 use crate::complex::Complex;
 use std::convert::identity;
-use std::ops::{Add,Index,IndexMut,Mul,Sub, Div};
+use std::f64::NEG_INFINITY;
+use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
 use num_traits::{zero, Float, One, Zero};
@@ -85,6 +86,17 @@ where
 {
    v1.iter().zip(v2).map(|(&x,&y)| x + y).collect()
 }
+
+/// Return nth identity vector
+fn nth_identity_vector<T>(idx: usize, size: usize) -> Vec<T>
+where
+   T: Copy + Zero + One
+{
+   let mut vec = vec![T::zero(); size];
+   vec[idx-1] = T::one();
+   vec
+}
+
 // Define a generic matrix structure
 // with data stored as row dominant
 #[derive(Debug, Clone)]
@@ -261,8 +273,22 @@ impl<T: Clone + Copy> Matrix<T>
       (self.diag()).iter().all(|&x| x == T::one())
    }
 
+   // Get nth row to Vec<T>
+   pub fn row_set(self, idx: u128, row: Vec<T>) -> Self
+   where 
+      {
 
-   // Get nth col as Vec<T>
+      let mut data= self.data;
+      data.splice((self.cols *(idx - 1)) as usize..((self.cols *(idx - 1))+self.cols) as usize,row);      
+ 
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: data.to_vec()
+      }
+   }   
+
+   // Set nth col to Vec<T>
    pub fn col_set(self, idx: u128, col: Vec<T>) -> Self
    where 
       {
@@ -308,6 +334,80 @@ impl<T: Clone + Copy> Matrix<T>
          data: result_vec
       }
    }
+
+   // Extract sub-matrix from matrix by specifying a row range and column range
+   pub fn sub_matrix(self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
+   where 
+      T: Zero
+      {
+         assert!(1 <= *rows.clone().start(),"Row range start >= 1.");
+         assert!(self.rows >= *rows.clone().end(),"Row range end <= Number of Rows.");
+         assert!(1 <= *cols.clone().start(),"Col range start >= 1.");
+         assert!(self.cols >= *cols.clone().end(),"Col range end <= Number of Columns.");
+
+         let extracted_data = self.data
+         .iter()
+         .enumerate()
+         .skip((self.cols * (rows.start()-1) + (cols.start() - 1)) as usize)
+         .step_by(2*(self.cols as usize) - cols.clone().count() - 1)
+         .filter_map(|(start_idx, _)| {
+            if start_idx + cols.clone().count() <= self.data.len() {
+               Some(self.data[start_idx..start_idx + cols.clone().count()].to_vec())
+            } else {
+               None
+            }
+         })
+         .flatten()
+         .collect();
+
+      Self::new(rows.count() as u128, cols.count() as u128, extracted_data)
+   }
+
+   // Extend a matrix by inserting a row immediately after idx
+   // If idx == <u128>::max_value() then insert as index 1
+   pub fn insert_row(self, idx: u128, row: Vec<T>) -> Self
+   {
+      //assert!(1 <= idx && idx <= self.rows,"Row insert 1 <= {} <= {} in matrix.",idx,self.rows);
+      assert_eq!( row.len(), self.cols as usize,"Row vector must have same dimension and matrix columns.");
+      
+      let index = if idx == <u128>::max_value() {0} else {(self.cols * idx) as usize};
+      let mut data = self.data;
+      data.splice(index..index,row.clone());
+      Self { rows: self.rows + 1, cols: self.cols, data: data }
+   }
+
+   // Extend a matrix by inserting a col immediately after idx
+   // If idx == <u128>::max_value() then insert as index 1
+   pub fn insert_col(self, idx: u128, col: Vec<T>) -> Self
+   {
+      //assert!(1 <= idx && idx <= self.cols,"Col insert 1 <= index <= number of cols in matrix.");
+      assert_eq!( col.len(), self.rows as usize,"Column vector must have same dimension and matrix rows.");
+
+      let mut index:usize = if idx == <u128>::max_value() {0} else {idx as usize};
+      let mut data = self.data;
+      for x in col{
+         data.insert(index,x.clone());
+         index += (self.cols + 1) as usize;
+      }
+      Self { rows: self.rows, cols: self.cols + 1, data: data }
+   }
+
+   /// lock Matrix Augmentation: Adding an identity sub-matrix to the top-left corner of a larger matrix, 
+   /// while padding the rest with zeros, creates a block matrix. This process could also be considered 
+   /// a form of direct sum in certain contexts.
+   pub fn augment(self, id_dimen: u128) -> Self
+   where 
+      T: Zero + One + PartialEq
+      {
+         let mut aug_mat = self;
+         for i in 1..=id_dimen {
+            aug_mat = aug_mat.clone()
+               .insert_row(<u128>::max_value(), vec![<T>::zero(); aug_mat.cols as usize])
+               .insert_col(<u128>::max_value(), nth_identity_vector(1, aug_mat.rows as usize + 1) );           
+         }
+         aug_mat
+   }
+
 }
 
 
@@ -376,6 +476,80 @@ impl<T> Matrix<Complex<T>>
       } else {
          false
       }
+   }
+
+   // Complex QR-decomposition using CHT
+   pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
+   where
+   T:Copy + Zero + Float + From<f64> + Debug,
+   f64: From<T> + Mul<T>
+   {
+
+      // Column by column build the Q and R matrices of A such
+      // that Q R = A and Q has orthonormal column vectors 
+      // and R is an upper diagonal matrix
+
+      // For a given matrix A in the iteration;
+      // Calc CHT for the first col vector
+      let mut A = mat;
+      let mut CHT = Matrix::<Complex<T>>::householder_transform(A.col(1));
+      let mut R = CHT.clone(); // first time does not need a resize.
+      let mut Q = CHT.clone().trans(); // complex conj transpose?
+
+      let mut start_index = 2;
+      
+      // Begin iteration ///////////////////////////////////////////////////////////////////////////
+
+      // Operate the CHT on the original matrix and get the sub-matrix
+      A = (CHT.clone() * A.clone()).sub_matrix(start_index..=A.rows, start_index..=A.cols);
+
+      // Calc CHT for first column vector and augment
+      CHT = Matrix::<Complex<T>>::householder_transform(A.col(1)).augment(1);
+
+      // Augment A back to original; dimensions
+      A = A.augment(1);
+
+      Q = Q * CHT.clone().trans();
+      R = CHT.clone() * R;
+
+      start_index += 1;
+      // End iteration
+
+      // Begin iteration ////////////////////////////////////////////////////////////////////////////
+
+      // Operate the CHT on the original matrix and get the sub-matrix
+      A = (CHT.clone() * A.clone()).sub_matrix(start_index..=A.rows, start_index..=A.cols);
+
+      // Calc CHT for first column vector and augment
+      CHT = Matrix::<Complex<T>>::householder_transform(A.col(1)).augment(2);
+
+      // Augment A back to original; dimensions
+      A = A.augment(2);
+
+      Q = Q * CHT.clone().trans();
+      R = CHT.clone() * R;
+
+      start_index += 1;
+      // Operate the CHT on the original matrix and get the sub-matrix
+      // A = (CHT.clone() * A.clone()).sub_matrix(start_index..=A.rows, start_index..=A.cols);
+      // println!("A {:?}", A);
+
+      // // // Calc CHT for first column vector
+      // CHT = Matrix::<Complex<T>>::householder_transform(A.col(1))
+      //       .insert_row(<u128>::max_value(), vec![Complex::<T>::zero(); CHT.cols as usize - 1])
+      //       .insert_col(<u128>::max_value(), nth_identity_vector(1, CHT.rows as usize));
+
+      // // Enlarge A
+      // A = A.clone().insert_row(<u128>::max_value(), vec![Complex::<T>::zero(); A.cols as usize])
+      // .insert_col(<u128>::max_value(), nth_identity_vector(1, A.rows as usize + 1));
+
+      // Q = Q * CHT.clone().trans();
+      // R = CHT.clone() * R;
+
+      // start_index += 1;
+      // End iteration      
+      
+      (Q,A)
    }
 
    // Householder Transform for Complex Matrices (CHT)
