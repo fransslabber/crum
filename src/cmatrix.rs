@@ -2,7 +2,10 @@ use crate::complex::Complex;
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
-use num_traits::{Float, One, Signed, Zero};
+use num_traits::{Float, One, Zero,Signed};
+use rand::distributions::uniform::SampleUniform;
+use rand::distributions::{Distribution, Standard};
+use rand::Rng;
 
 ///
 /// Some linear algebra operations on vector quantities
@@ -355,7 +358,7 @@ impl<T: Clone + Copy> Matrix<T>
    /// Extract sub-matrix from matrix by specifying a row range and column range
    pub fn sub_matrix(self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
    where 
-      T: Zero + Debug + Display
+      T: Zero
       {
          assert!(1 <= *rows.clone().start(),"Row range start >= 1.");
          assert!(self.rows >= *rows.clone().end(),"Row range end <= Number of Rows.");
@@ -424,6 +427,13 @@ impl<T: Clone + Copy> Matrix<T>
          aug_mat
    }
 
+   /// Determinant of a 2x2 Matrix
+   pub fn det_2x2(self) -> T
+   where 
+      T: Mul<Output = T> + Sub<Output = T> {
+      (self.data[0]*self.data[3]) - (self.data[1]*self.data[2])
+   }
+
 }
 
 
@@ -472,6 +482,20 @@ impl<T> Matrix<Complex<T>>
       Matrix<Complex<T>>: PartialEq,
       T: Clone + Float + std::ops::Neg<Output = T>
 {
+   pub fn rnd_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
+   where 
+      T: SampleUniform {
+      let mut rng = rand::thread_rng(); // Create a thread-local RNG
+      let size = rows * cols; // Define the size of the vector
+
+      // Fill the vector with random numbers between 0 and 100
+      let random_numbers: Vec<Complex<T>> = (0..size)
+         .map(|_| Complex::new(rng.gen_range(rnd.clone()),rng.gen_range(rnd.clone())) ) // Generate numbers in the range [0, 100]
+         .collect();
+
+      Matrix::new(rows,cols,random_numbers)
+   }
+
    // Get the complex conjugate of a complex vector
    pub fn vec_conj(v: Vec<Complex<T>>) -> Vec<Complex<T>> {
       v.iter().map(|x| Complex::new(x.real(),-x.imag())).collect()
@@ -500,7 +524,7 @@ impl<T> Matrix<Complex<T>>
    /// 
    pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
    where
-   T:Copy + Zero + Float + From<f64> + Debug + Display + Signed,
+   T:Copy + Zero + Float + From<f64>,
    f64: From<T> + Mul<T>
    {
       assert!(mat.rows >= mat.cols, "CHT for QR only valid when rows >= cols.");
@@ -543,7 +567,7 @@ impl<T> Matrix<Complex<T>>
    /// Householder Transform for Complex Matrices (CHT)
    pub fn householder_transform(x: Vec<Complex<T>>) -> Self
       where
-         T:Copy + Zero + Float + From<f64> + Debug,
+         T:Copy + Zero + Float + From<f64>,
          f64: From<T> + Mul<T>
          {
             //println!("x {:?}", x);
@@ -570,6 +594,57 @@ impl<T> Matrix<Complex<T>>
             CHT.unwrap()
          }
 
+   
+   /// Perform Schur decomposition on complex matrix
+   pub fn schur(self) -> Self
+   where 
+      T:Copy + Zero + Float + From<f64> + Display + Signed,
+      f64: From<T> + Mul<T>
+   {
+       // explicitly shifted QR algo with Rayleigh quotient shift
+      let mut mat_a: Matrix<Complex<T>> = self;
+      //let mut mat_e: Matrix<Complex<T>> = Matrix::new(mat_a.rows,1,nth_identity_vector( mat_a.cols as usize, mat_a.cols as usize));
+      //let mut shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
+      //let mut intshift = shift[(1,1)];
+      //let mat_i = Matrix::<Complex<T>>::identity(mat_a.rows as usize);
+      //mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
+      
+      let (mut Q,mut R) = Matrix::<Complex<T>>::qr_cht(mat_a);
+
+      println!("ping");
+      // update a
+      // mat_a = ((R.clone() * Q.clone()) + mat_i.clone().mul(intshift)).unwrap();
+      mat_a = R.clone() * Q.clone();
+      for i in 1..=14 {
+      // start iteration
+      //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
+      //intshift = shift[(1,1)];
+     // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
+      (Q,R) = Matrix::<Complex<T>>::qr_cht(mat_a);
+      //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
+      mat_a = R.clone() * Q.clone();
+      //println!("eval {}", mat_a)     ;
+      // end iteration
+      }
+
+      mat_a
+   }
+
+   pub fn eigen_2x2(self) -> (Complex<T>, Complex<T>)
+   where
+      T: From<f64>,
+      f64: From<T>
+   {
+      // Discriminant (trace^2 - 4 * determinant)
+      let trace = self.data[0] + self.data[3];
+      let discriminant = (trace * trace) - Complex::<T>::new(<T as From<f64>>::from(4.0), T::zero()) * self.det_2x2();
+
+      // Eigenvalues using the quadratic formula
+      let lambda1 = (Complex::from(trace) + discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
+      let lambda2 = (Complex::from(trace) - discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
+
+      (lambda1, lambda2)
+   }
 
 }
 
@@ -607,11 +682,9 @@ macro_rules! matrix {
       }
    };
    
-   // ( $rows:expr; $cols:expr; $val:expr; $t:ty ) => {{
-   //          let data = Vec<$t>::from_element($val,$rows * $cols);
-   //          //println!("Rows {} Cols {}", rows, first_row_cols);
-   //          Matrix::new($rows, $cols, data)
-   // }};
+   ( $rows:expr; $cols:expr; $val:expr) => {{
+      Matrix::new($rows, $cols, vec![$val;$rows * $cols])
+   }};
 }
 
 //

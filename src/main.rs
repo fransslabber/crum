@@ -1,11 +1,8 @@
 mod complex;
 mod cmatrix;
 
-use std::u128::MAX;
-
 use complex::Complex; // Import the Complex structs
 use cmatrix::Matrix;
-use num_traits::Float;
 
 fn main() {
    // // Example usage with f64
@@ -79,11 +76,15 @@ fn main() {
    // println!("CHT {} \nX {} \nCHT*X {}",CHT.clone(),X.clone(), CHT*X );
 
 
-   let m_complex_f  = matrix![[Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
-                                                [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
-                                                [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 1.2)],
-                                                [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
-                                                [Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)]];
+   // let m_complex_f  = matrix![[Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+   //                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
+   //                                                 [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 1.2)],
+   //                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
+   //                                                 [Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+   //                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
+   //                                                 [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 1.2)],
+   //                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
+   //                                                 [Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)]];
    
    //println!( "sub-matrix (2..3,2..3) {}", m_complex_f.clone().sub_matrix(2..=3,2..=3));
    
@@ -92,8 +93,12 @@ fn main() {
    
    //println!( "Augment {}", m_complex_f.augment(2));   
 
-   let (x,y) = Matrix::<Complex<f64>>::qr_cht(m_complex_f.clone());
-   println!( "Q{}\nR{}\nA{}", x.clone(),y.clone(),x.clone()*y.clone());
+   // let (x,y) = Matrix::<Complex<f64>>::qr_cht(m_complex_f.clone());
+   // println!( "Q{}\nR{}\nA{}", x.clone(),y.clone(),x.clone()*y.clone());
+
+   // let m_complex_u64 = Matrix::rnd_matrix(10,3,1.0..=101.0);
+   // let (x,y) = Matrix::<Complex<f64>>::qr_cht(m_complex_u64.clone());
+   // println!( "Original{}\nQ{}\nR{}\nA{}",m_complex_u64, x.clone(),y.clone(),x.clone()*y.clone());
 
    // let m_identity_4_4 = Matrix::<Complex<f64>>::identity(4);
 
@@ -152,5 +157,14 @@ fn main() {
    //    [3.0, 4.0, 8.0]];
 
    // println!("transpose {:?}", n.trans());
+
+   let m_complex_f64 = matrix![[Complex::new(0.9501,0.0),Complex::new( 0.8913,0.0),Complex::new(0.8214,0.0),Complex::new(0.9218,0.0)],
+                                                   [Complex::new(0.2311,0.0),Complex::new(0.7621,0.0),Complex::new(0.4447,0.0),Complex::new(0.7382,0.0)],
+                                                   [Complex::new(0.6068,0.0),Complex::new(0.4565,0.0),Complex::new(0.6154,0.0),Complex::new(0.1763,0.0)],
+                                                   [Complex::new(0.4860,0.0),Complex::new(0.0185,0.0),Complex::new(0.7919,0.0),Complex::new(0.4057,0.0)]];  
+
+   println!( "Schur Decomposition {:?}",m_complex_f64.schur().sub_matrix(2..=3, 2..=3));
+   
+
 
 }

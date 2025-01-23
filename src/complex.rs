@@ -2,6 +2,7 @@ use num_traits::{Float, Num, NumCast, One, Signed, ToPrimitive, Zero};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,Rem};
 use std::fmt::Display;
 use std::iter::Sum;
+//use rand::distributions::{Distribution, Standard};
 
 // Define a generic Complex structure
 #[derive(Debug, Clone, Copy, PartialEq,PartialOrd)]
@@ -192,6 +193,11 @@ where
    pub fn real(&self) -> T
    {
       self.real
+   }
+
+   pub fn is_real(&self) -> bool
+   {
+      self.imag == T::zero()
    }
 
    pub fn imag(&self) -> T
@@ -650,5 +656,16 @@ impl<T: Display + Clone + Signed + PartialOrd> Display for Complex<T> {
       Ok(())
    }
 }
+
+// impl<T> Distribution<Complex<T>> for Standard
+// where 
+//    T: rand::Rng + Zero + PartialEq {
+//    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Complex<T> {
+//       Complex {
+//          real: rng.gen_range(Complex::<T>::zero()..100),
+//          imag: rng.gen_range(0.0..1.0),
+//       }
+//    }
+// }
 
 
