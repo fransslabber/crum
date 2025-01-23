@@ -355,7 +355,7 @@ impl<T: Clone + Copy> Matrix<T>
    /// Extract sub-matrix from matrix by specifying a row range and column range
    pub fn sub_matrix(self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
    where 
-      T: Zero
+      T: Zero + Debug + Display
       {
          assert!(1 <= *rows.clone().start(),"Row range start >= 1.");
          assert!(self.rows >= *rows.clone().end(),"Row range end <= Number of Rows.");
@@ -366,7 +366,7 @@ impl<T: Clone + Copy> Matrix<T>
          .iter()
          .enumerate()
          .skip((self.cols * (rows.start()-1) + (cols.start() - 1)) as usize)
-         .step_by(2*(self.cols as usize) - cols.clone().count() - 1)
+         .step_by(self.cols as usize)
          .filter_map(|(start_idx, _)| {
             if start_idx + cols.clone().count() <= self.data.len() {
                Some(self.data[start_idx..start_idx + cols.clone().count()].to_vec())
@@ -376,7 +376,6 @@ impl<T: Clone + Copy> Matrix<T>
          })
          .flatten()
          .collect();
-
       Self::new(rows.count() as u128, cols.count() as u128, extracted_data)
    }
 
@@ -497,6 +496,8 @@ impl<T> Matrix<Complex<T>>
    }
 
    /// Do complex QR-decomposition using complex Householder Transforms
+   /// Require rows >= cols.
+   /// 
    pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
    where
    T:Copy + Zero + Float + From<f64> + Debug + Display + Signed,
@@ -517,8 +518,7 @@ impl<T> Matrix<Complex<T>>
       let mut start_index = 1;      
       let cycles = (mat.rows-1).min(mat.cols);
 
-      while start_index <= cycles {
-
+      while start_index < cycles { // Remember, we have already done one iteration above
          // Begin iteration /////////////////////////////////////////////////////////////
 
          // Operate the CHT on the original matrix and get the sub-matrix
@@ -551,7 +551,7 @@ impl<T> Matrix<Complex<T>>
             it is denoted the Complex Householder Transform (CHT).
             The CHT is applied to a column vector x to zero out all
             the elements except the first one. */
-            let I = Matrix::<Complex<T>>::identity(x.len());
+            
             let x_norm_2 = norm_2(&x);
             let exp_jtheta_x1 = x[0]/(x[0]*x[0].conj()).sqrt();
             let mut u = x.clone();
@@ -565,7 +565,7 @@ impl<T> Matrix<Complex<T>>
             let u_uh: Matrix<Complex<T>> = cvec_rvec(&u,&uh);
             let u_uh_multipled_data:Vec<Complex<T>> = u_uh.data.iter().map(|x| Complex::<T>::new((Into::<T>::into(2.0)/uh_u.real()) * x.real(), (Into::<T>::into(2.0)/uh_u.real()) * x.imag())).collect();
             let U_Uh = Matrix::new(x.len()as u128,x.len() as u128, u_uh_multipled_data);
-            let CHT = I - U_Uh;      
+            let CHT = Matrix::<Complex<T>>::identity(x.len()) - U_Uh;      
 
             CHT.unwrap()
          }

@@ -635,9 +635,17 @@ impl<T> Sum for Complex<T>
 impl<T: Display + Clone + Signed + PartialOrd> Display for Complex<T> {
    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       if self.imag < T::zero() {
-         write!(f, "{}-i{}", format!("{:5.2}",self.real.clone()), format!("{:5.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
+         if self.real < T::zero() {
+            write!(f, "{} - i{}", format!("{:5.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
+         } else {
+            write!(f, " {} - i{}", format!("{:4.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written");
+         }
       } else {
-         write!(f, "{}+i{}", format!("{:5.2}",self.real.clone()),format!("{:5.2}",self.imag.clone())).expect("Not Written");
+         if self.real < T::zero() {
+            write!(f, "{} + i{}", format!("{:5.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
+         } else {
+            write!(f, " {} + i{}", format!("{:4.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written");
+         }
       }
       Ok(())
    }

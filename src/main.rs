@@ -81,7 +81,9 @@ fn main() {
 
    let m_complex_f  = matrix![[Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
                                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
-                                                [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 1.2)]];
+                                                [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 1.2)],
+                                                [Complex::new(6.1, 4.0), Complex::new(1.0, 3.0), Complex::new(2.0, -5.0)],
+                                                [Complex::new(7.0, 8.9), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)]];
    
    //println!( "sub-matrix (2..3,2..3) {}", m_complex_f.clone().sub_matrix(2..=3,2..=3));
    
