@@ -90,9 +90,8 @@ fn main() {
    
    //println!( "Augment {}", m_complex_f.augment(2));   
 
-   let (x,y) = Matrix::<Complex<f64>>::qr_cht(m_complex_f);
-   println!( "Q{}\nR{}", x,y);                                                
-
+   let (x,y) = Matrix::<Complex<f64>>::qr_cht(m_complex_f.clone());
+   println!( "Q{}\nR{}\nA{}", x.clone(),y.clone(),x.clone()*y.clone());
 
    // let m_identity_4_4 = Matrix::<Complex<f64>>::identity(4);
 

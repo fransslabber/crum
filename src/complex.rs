@@ -12,7 +12,7 @@ pub struct Complex<T>
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/// Implement One,Zero,Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign for Complex<T>
+/// Implement One,Zero,Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign for Complex\<T\>
 ///  
 
 // Implement the Zero trait for Complex<T>
@@ -166,7 +166,7 @@ where
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/// Standard Functions new,norm, magnitude,real,imag,conj for Complex<T>
+/// Standard Functions new,norm, magnitude,real,imag,conj for Complex
 /// 
 impl<T> Complex<T>
 where 
@@ -245,7 +245,7 @@ where
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////
-/// Implement Float for Complex<T>
+/// Implement Float for Complex\<T\>
 /// 
 
 impl<T> Float for Complex<T>
@@ -561,7 +561,7 @@ where
    }
 }
 
-/// Implement the % trait for Complex<T>
+/// Implement the % trait for Complex\<T\>
 impl<T> Rem for Complex<T>
 where
    T: Clone + Into<f64> + From<f64> + Float + Num
@@ -597,7 +597,7 @@ where
 }
 
 
-// Implement `Num` for `Complex<T>`
+// Implement `Num` for `Complex\<T\>`
 impl<T> Num for Complex<T>
 where
    T: Float + Num + Copy + std::convert::From<f64>,
