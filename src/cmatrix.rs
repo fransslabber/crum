@@ -1,5 +1,6 @@
 use crate::complex::Complex;
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
+use std::process::Output;
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
 use num_traits::{Float, One, Zero,Signed};
@@ -269,6 +270,22 @@ impl<T: Clone + Copy> Matrix<T>
       data
    }
 
+   /// The general term for any diagonal going top-left to bottom-right direction is k-diagonal 
+   /// where k is an offset form the main diagonal. k=1 is the superdiagonal, k=0 is the main diagonal, and k=−1
+   /// is the subdiagonal. According to Mathworld, the general term for the antidiagonals seems to be skew-diagonals.
+   pub fn skew_diag(&self,offset: i32) -> Vec<T>
+   where 
+      T: Clone {
+      assert_eq!(self.cols, self.rows, "Matrix must be square.");
+      let data: Vec<T> = self.data
+                              .iter()
+                              .skip( if offset < 0 { offset.abs() as usize * self.cols as usize  } else { offset as usize})
+                              .step_by((self.cols+1) as usize)
+                              .cloned()
+                              .collect(); 
+      data
+   }
+
    /// Construct a n x n identity matrix
    pub fn identity(dimen: usize) -> Self
    where 
@@ -356,22 +373,23 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Extract sub-matrix from matrix by specifying a row range and column range
-   pub fn sub_matrix(self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
+   pub fn sub_matrix(&self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
    where 
       T: Zero
       {
-         assert!(1 <= *rows.clone().start(),"Row range start >= 1.");
-         assert!(self.rows >= *rows.clone().end(),"Row range end <= Number of Rows.");
-         assert!(1 <= *cols.clone().start(),"Col range start >= 1.");
-         assert!(self.cols >= *cols.clone().end(),"Col range end <= Number of Columns.");
+         assert!(1 <= *rows.start(),"Row range start >= 1.");
+         assert!(self.rows >= *rows.end(),"Row range end {} <= Number of Rows {}.",*rows.end(), self.rows);
+         assert!(1 <= *cols.start(),"Col range start >= 1.");
+         assert!(self.cols >= *cols.end(),"Col range end <= Number of Columns.");
 
-         let extracted_data = self.data
+         let skip = (self.cols * (rows.start()-1) + (cols.start() - 1)) as usize;
+         let extracted_data:Vec<T> = self.data
          .iter()
          .enumerate()
-         .skip((self.cols * (rows.start()-1) + (cols.start() - 1)) as usize)
+         .skip(skip)
          .step_by(self.cols as usize)
          .filter_map(|(start_idx, _)| {
-            if start_idx + cols.clone().count() <= self.data.len() {
+            if start_idx < ((rows.clone().count() * self.cols as usize)+skip) {
                Some(self.data[start_idx..start_idx + cols.clone().count()].to_vec())
             } else {
                None
@@ -379,6 +397,7 @@ impl<T: Clone + Copy> Matrix<T>
          })
          .flatten()
          .collect();
+      //println!("rows {:?} \ncols {:?} \ninput {} \ndata {:?}", rows,cols,self,extracted_data);
       Self::new(rows.count() as u128, cols.count() as u128, extracted_data)
    }
 
@@ -434,6 +453,33 @@ impl<T: Clone + Copy> Matrix<T>
       (self.data[0]*self.data[3]) - (self.data[1]*self.data[2])
    }
 
+   /// Convert Real to Complex Matrix
+   pub fn to_complex(&self) -> Matrix<Complex<T>>
+   where 
+      T: Zero + Float
+   {
+      let data: Vec<Complex<T>> = self.data
+                  .iter()
+                  .map(|x| Complex::<T>::new(*x, T::zero()))
+                  .collect();
+
+      Matrix::<Complex<T>>::new(self.rows,self.cols,data)
+   }
+
+   pub fn rnd_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
+   where 
+      T: SampleUniform + PartialOrd {
+      let mut rng = rand::thread_rng(); // Create a thread-local RNG
+      let size = rows * cols;
+
+      // Fill the vector with random numbers in defined range
+      let random_numbers = (0..size)
+         .map(|_| rng.gen_range(rnd.clone()) )
+         .collect();
+
+      Matrix::new(rows,cols,random_numbers)
+   }
+
 }
 
 
@@ -482,7 +528,7 @@ impl<T> Matrix<Complex<T>>
       Matrix<Complex<T>>: PartialEq,
       T: Clone + Float + std::ops::Neg<Output = T>
 {
-   pub fn rnd_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
+   pub fn rnd_complex_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
    where 
       T: SampleUniform {
       let mut rng = rand::thread_rng(); // Create a thread-local RNG
@@ -596,9 +642,9 @@ impl<T> Matrix<Complex<T>>
 
    
    /// Perform Schur decomposition on complex matrix
-   pub fn schur(self) -> Self
+   pub fn schur(self, threshold: T) -> Self
    where 
-      T:Copy + Zero + Float + From<f64> + Display + Signed,
+      T:Copy + Zero + Float + From<f64> + Debug,
       f64: From<T> + Mul<T>
    {
        // explicitly shifted QR algo with Rayleigh quotient shift
@@ -611,20 +657,24 @@ impl<T> Matrix<Complex<T>>
       
       let (mut Q,mut R) = Matrix::<Complex<T>>::qr_cht(mat_a);
 
-      println!("ping");
       // update a
       // mat_a = ((R.clone() * Q.clone()) + mat_i.clone().mul(intshift)).unwrap();
       mat_a = R.clone() * Q.clone();
-      for i in 1..=14 {
-      // start iteration
-      //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
-      //intshift = shift[(1,1)];
-     // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
-      (Q,R) = Matrix::<Complex<T>>::qr_cht(mat_a);
-      //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
-      mat_a = R.clone() * Q.clone();
-      //println!("eval {}", mat_a)     ;
-      // end iteration
+      let mut max_iter = 1;
+      let mut epsilon = norm_2(&mat_a.skew_diag(-1)).magnitude();
+      while epsilon > threshold && max_iter < 1000 {
+         epsilon = norm_2(&mat_a.skew_diag(-1)).magnitude();
+         println!("Epsilon: {:?} Threshold: {:?} Iter: {}", epsilon,threshold,max_iter);
+         // start iteration
+         //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
+         //intshift = shift[(1,1)];
+      // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
+         (Q,R) = Matrix::<Complex<T>>::qr_cht(mat_a);
+         //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
+         mat_a = R.clone() * Q.clone();
+         //println!("eval {}", mat_a)     ;
+         // end iteration
+         max_iter += 1;
       }
 
       mat_a
@@ -644,6 +694,64 @@ impl<T> Matrix<Complex<T>>
       let lambda2 = (Complex::from(trace) - discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
 
       (lambda1, lambda2)
+   }
+
+   /// Generalized eigenvalues - takes a complex Schur decomposition
+   /// and finds all real and complex eigenvalues
+   pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
+   where 
+      T: Float + From<f64>,
+      f64: From<T> + Mul<T>
+   {
+      assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
+      let mut eigen_values_real = Vec::<T>::new();
+      let mut eigen_values_complex = Vec::<Complex<T>>::new();
+
+
+      // set real-complex split threshold
+      let threshold = Complex::new(<T as From<f64>>::from(0.001),<T as From<f64>>::from(0.001)).magnitude();
+
+      // Process diagonal : if block then complex conjugate eigen pair, if not then real eigen value
+      // For each elem(ij), if elem(i+1,j) == zero, then elem(ij) is a real eigen value, and skip 1 diag elem, else;
+      // the 2x2 sub-matrix i..i+1 x j..j+1 has complex conjugate eigenvalue pairs.
+
+      let mut row_idx = 1_u128;
+      let mut col_idx = 1_u128;
+
+      while row_idx <= self.rows {
+         while col_idx <= self.cols {
+
+            if row_idx == self.rows && col_idx == self.cols {
+               //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+               eigen_values_real.push(self[(row_idx,col_idx)].real());
+               row_idx += 1;
+               col_idx += 1;
+            } else{
+               if self[(row_idx+1,col_idx)].magnitude() <= threshold {
+                  //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+                  eigen_values_real.push(self[(row_idx,col_idx)].real());
+                  row_idx += 1;
+                  col_idx += 1;
+
+               } else {
+                  let schur_sub = self.sub_matrix(row_idx as u128..= (row_idx+1)  as u128, col_idx as u128..=(col_idx+1) as u128);
+                  let (lambda1,lambda2) = Matrix::eigen_2x2(schur_sub);
+                  // Check if we have a complex conjugate pair
+                  if lambda1.conj() == lambda2 {
+                     //println!("eigen complex: {} {}",lambda1,lambda2 );
+                     eigen_values_complex.push(lambda1);
+                     eigen_values_complex.push(lambda2);
+                     row_idx += 2; col_idx += 2;
+                  } else {
+                     eigen_values_real.push(self[(row_idx,col_idx)].real());
+                     row_idx += 1;
+                     col_idx += 1;                     
+                  }
+               }
+            }
+         }
+      }
+      (eigen_values_real,eigen_values_complex)
    }
 
 }
