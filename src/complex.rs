@@ -56,7 +56,26 @@ where
    }
 }
 
-// Implement the + trait for Complex<T>
+/// Implement the + trait for Complex<T>
+///
+/// # Arguments
+///
+/// * `v1` - complex nume.
+/// * `v2` - The second vector.
+///
+/// # Returns
+///
+/// The dot product of `v1` and `v2`.
+///
+/// # Example
+///
+/// ```
+/// use crum::complex::Complex;
+/// let result = Complex::new(5.8, 3.4) + Complex::new(2.1, 4.0);
+/// assert_eq!(result, Complex::new(7.9, 7.4));
+/// let result2 = Complex::new(5, 3) + Complex::new(2, 4);
+/// assert_eq!(result2, Complex::new(7, 7));
+/// ```
 impl<T> Add for Complex<T>
 where
    T: Add<Output = T>
@@ -109,6 +128,25 @@ where
 }
 
 // Implement * (a + bi) * (c + di) = (ac - bd) + (ad + bc)i
+///
+/// # Arguments
+///
+/// * `v1` - complex nume.
+/// * `v2` - The second vector.
+///
+/// # Returns
+///
+/// The dot product of `v1` and `v2`.
+///
+/// # Example
+///
+/// ```
+/// use crum::complex::Complex;
+/// let result = Complex::new(5.8, 3.4) * Complex::new(2.1, 4.0);
+/// assert_eq!(result, Complex::new(-1.42, 30.34));
+/// let result2 = Complex::new(5, 3) * Complex::new(2, 4);
+/// assert_eq!(result2, Complex::new(-2, 26));
+/// ```
 impl<T> Mul for Complex<T>
 where
    T: Clone + Mul<Output = T> + Add<Output = T> + Sub<Output = T>
@@ -170,8 +208,8 @@ where
 /// Standard Functions new,norm, magnitude,real,imag,conj for Complex
 /// 
 impl<T> Complex<T>
-where 
- T: Float
+where
+   T: Copy
 {
    // Constructor for a new complex number
    pub fn new(real: T, imag: T) -> Self 
@@ -179,32 +217,35 @@ where
       Self { real, imag }
    }
 
-   pub fn norm(&self) -> T {
-      (self.real * self.real + self.imag * self.imag).sqrt()
-   }
-
    // absolute value/modulus/hypotenuse/magnitude
    pub fn magnitude(&self) -> T
+   where 
+      T: Float
    {      
       (self.real * self.real + self.imag * self.imag).sqrt()
    }
 
-   // 
+   #[allow(dead_code)]
    pub fn real(&self) -> T
    {
       self.real
    }
 
+   #[allow(dead_code)]
    pub fn is_real(&self) -> bool
+   where 
+      T: Zero + PartialEq
    {
       self.imag == T::zero()
    }
 
+   #[allow(dead_code)]
    pub fn imag(&self) -> T
    {
       self.imag
    }
 
+   #[allow(dead_code)]
    pub fn conj(&self) -> Self
    where
    T: Neg<Output = T>
@@ -216,7 +257,10 @@ where
    }
 
    // Returns a Complex<T> value from polar coords ( angle in radians )
+   #[allow(dead_code)]
    pub fn polar(magnitude: T,phase_angle: T ) -> Complex<T>
+   where 
+      T: Float
    {
       Complex { real: magnitude * phase_angle.cos(), imag: magnitude * phase_angle.sin()}
    }
@@ -231,7 +275,10 @@ where
 
    Returning zz as is if it is finite.
    Returning "infinity" when the magnitude exceeds a certain threshold. */
+   #[allow(dead_code)]
    pub fn proj(&self) -> Self
+   where 
+      T: Float
    {
       let magnitude = self.magnitude();
       let infinity = T::infinity();
@@ -337,7 +384,7 @@ where
    }
 
    fn recip(self) -> Self {
-      let mag_sq = self.norm();
+      let mag_sq = self.magnitude();
       Self::new(self.real / mag_sq, -self.imag / mag_sq)
    }
 
@@ -356,7 +403,7 @@ where
       result
    }
 
-   fn powf(self, other: Self) -> Self {
+   fn powf(self, _other: Self) -> Self {
       todo!()
    }
 
@@ -408,7 +455,7 @@ where
          todo!()
       }
 
-   fn mul_add(self, a: Self, b: Self) -> Self {
+   fn mul_add(self, _a: Self, _b: Self) -> Self {
          todo!()
       }
 
@@ -416,7 +463,7 @@ where
          todo!()
       }
 
-   fn log(self, base: Self) -> Self {
+   fn log(self, _base: Self) -> Self {
          todo!()
       }
 
@@ -428,15 +475,15 @@ where
          todo!()
       }
 
-   fn max(self, other: Self) -> Self {
+   fn max(self, _other: Self) -> Self {
          todo!()
       }
 
-   fn min(self, other: Self) -> Self {
+   fn min(self, _other: Self) -> Self {
          todo!()
       }
 
-   fn abs_sub(self, other: Self) -> Self {
+   fn abs_sub(self, _other: Self) -> Self {
          todo!()
       }
 
@@ -444,7 +491,7 @@ where
          todo!()
       }
 
-   fn hypot(self, other: Self) -> Self {
+   fn hypot(self, _other: Self) -> Self {
          todo!()
       }
 
@@ -460,7 +507,7 @@ where
          todo!()
       }
 
-   fn atan2(self, other: Self) -> Self {
+   fn atan2(self, _other: Self) -> Self {
          todo!()
       }
 
@@ -526,7 +573,7 @@ where
          num_traits::clamp(self, min, max)
       }
 
-   fn copysign(self, sign: Self) -> Self {
+   fn copysign(self, _sign: Self) -> Self {
       todo!()
       }
 }
@@ -576,7 +623,7 @@ where
    
    // Division with remainder
    fn rem(self, other: Self) -> Self {
-      let norm = other.norm();
+      let norm = other.magnitude();
       let conjugate = other.conj();
 
       // Compute q = (self * conjugate) / norm

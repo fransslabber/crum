@@ -1,8 +1,4 @@
-mod complex;
-mod cmatrix;
-
-use complex::Complex; // Import the Complex structs
-use cmatrix::Matrix;
+use crum::matrix;
 
 fn main() {
    // // Example usage with f64
@@ -179,8 +175,8 @@ fn main() {
 
    //let m_f64 = Matrix::<f64>::rnd_matrix(10, 10, 0.0..=1.0);
    // Convert real matrix to Complex matrix; Perform Complex Schur decomposition; and then get real and complex eigenvalues
-   let threshold = 0.000000000001;
-   println!("Real matrix: {}\nEigen values: {:?}",m_f64.clone(), m_f64.to_complex().skew_diag(-1));//.schur(threshold));
+
+   println!("Real matrix: {}\nEigen values: {:?}",m_f64.clone(), m_f64.to_complex().schur(0.8).eigen_schur());
 
 
 

@@ -1,11 +1,10 @@
 use crate::complex::Complex;
+
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
-use std::process::Output;
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
-use num_traits::{Float, One, Zero,Signed};
+use num_traits::{Float, One, Zero};
 use rand::distributions::uniform::SampleUniform;
-use rand::distributions::{Distribution, Standard};
 use rand::Rng;
 
 ///
@@ -27,10 +26,12 @@ use rand::Rng;
 /// # Example
 ///
 /// ```
-/// let result = dot_product(vec![5, 3],vec![6,2]);
+/// use crum::matrix::dot_product;
+/// use crum::complex::Complex;
+/// let result = dot_product(&vec![5, 3],&vec![6,2]);
 /// assert_eq!(result, 36);
 /// ```
-fn dot_product<T>(v1: &Vec<T>, v2: &Vec<T>) -> T
+pub fn dot_product<T>(v1: &Vec<T>, v2: &Vec<T>) -> T
 where
    T: Copy + Zero + Mul<Output = T>
 {
@@ -38,7 +39,8 @@ where
 }
 
 /// Compute the magnitude of a vector
-fn magnitude<T>(v: &Vec<T>) -> T
+#[allow(dead_code)]
+pub fn magnitude<T>(v: &Vec<T>) -> T
 where
    T: Copy + Float
 {
@@ -46,18 +48,8 @@ where
    sum.sqrt()
 }
 
-
-/// norm of x of degree two = ||x||2 = ( x1 x∗1 + . . . + xk x∗k ).sqrt on complex numbers only
-pub fn norm_2<T>(vec: &Vec<Complex<T>>) -> Complex<T>
-where
-   T: Float + From<f64>,
-   f64: From<T>
-{
-   let sum = vec.iter().fold(Complex::<T>::zero(), |acc, x| acc + (*x) * x.conj());
-   sum.sqrt()
-}
-
 /// Compute the scalar * vector
+#[allow(dead_code)]
 fn scalar_mul<T>(v: &Vec<T>, a:T) -> Vec<T>
 where
    T: Clone + Mul<Output = T>
@@ -66,6 +58,7 @@ where
 }
 
 /// Compute col vector * row vector = square matrix
+#[allow(dead_code)]
 fn cvec_rvec<T>(v1: &Vec<T>, v2: &Vec<T>) -> Matrix<T> 
 where 
    T: Clone + Zero + Float
@@ -83,6 +76,7 @@ where
 }
 
 /// Compute the vector / scalar
+#[allow(dead_code)]
 fn scalar_div<T>(v: &Vec<T>, a:T) -> Vec<T>
 where
    T: Clone + Div<Output = T>
@@ -91,6 +85,7 @@ where
 }
 
 /// Compute vector - vector
+#[allow(dead_code)]
 fn vector_sub<T>(v1: &Vec<T>, v2: &Vec<T>) -> Vec<T>
 where
    T: Copy + Sub<Output = T>
@@ -99,6 +94,7 @@ where
 }
 
 /// Compute vector + vector
+#[allow(dead_code)]
 fn vector_add<T>(v1: &Vec<T>, v2: &Vec<T>) -> Vec<T>
 where
    T: Copy + Add<Output = T>
@@ -238,6 +234,7 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Get nth row as Vec
+   #[allow(dead_code)]
    pub fn row(&self, idx: u128) -> &[T] {
       &self.data[(self.cols*(idx-1)) as usize..((self.cols*(idx-1)) + self.cols) as usize]
    }
@@ -255,6 +252,7 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Get diagonal as Vec
+   #[allow(dead_code)]
    pub fn diag(&self) -> Vec<T> {
 
       assert_eq!(self.cols, self.rows, "Matrix must be square.");
@@ -303,6 +301,7 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Check if matrix is identity matrix
+   #[allow(dead_code)]
    pub fn is_identity(&self) -> bool
    where 
       T: One + PartialEq
@@ -311,6 +310,7 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Set nth row of a matrix
+   #[allow(dead_code)]
    pub fn row_set(self, idx: u128, row: Vec<T>) -> Self
    where 
       {
@@ -326,6 +326,7 @@ impl<T: Clone + Copy> Matrix<T>
    }   
 
    /// Set nth col of a matrix
+   #[allow(dead_code)]
    pub fn col_set(self, idx: u128, col: Vec<T>) -> Self
    where 
       {
@@ -337,7 +338,6 @@ impl<T: Clone + Copy> Matrix<T>
       
       let mut index:usize = 0;
       for x in vec_iter{
-         let temp = &col[index];
          *x = col[index].clone();
          index += 1;
       }
@@ -351,8 +351,21 @@ impl<T: Clone + Copy> Matrix<T>
 }
 
    /// Get matrix data as Vec; row dominant
+   #[allow(dead_code)]
    pub fn data(&self) -> Vec<T> {
       self.data.clone()
+   }
+
+   /// Get matrix data as Vec; row dominant
+   #[allow(dead_code)]
+   pub fn rows(&self) -> u128 {
+      self.rows
+   }
+
+         /// Get matrix data as Vec; row dominant
+   #[allow(dead_code)]
+   pub fn cols(&self) -> u128 {
+      self.cols
    }
 
    /// Transpose of a matrix
@@ -438,7 +451,7 @@ impl<T: Clone + Copy> Matrix<T>
       T: Zero + One + PartialEq
       {
          let mut aug_mat = self;
-         for i in 1..=id_dimen {
+         for _i in 1..=id_dimen {
             aug_mat = aug_mat.clone()
                .insert_row(<u128>::max_value(), vec![<T>::zero(); aug_mat.cols as usize])
                .insert_col(<u128>::max_value(), nth_identity_vector(1, aug_mat.rows as usize + 1) );           
@@ -466,6 +479,7 @@ impl<T: Clone + Copy> Matrix<T>
       Matrix::<Complex<T>>::new(self.rows,self.cols,data)
    }
 
+   #[allow(dead_code)]
    pub fn rnd_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
    where 
       T: SampleUniform + PartialOrd {
@@ -528,6 +542,66 @@ impl<T> Matrix<Complex<T>>
       Matrix<Complex<T>>: PartialEq,
       T: Clone + Float + std::ops::Neg<Output = T>
 {
+
+   /// norm of x of degree two(Frobenius Norm) = ||x||2 = ( x1 x∗1 + . . . + xk x∗k ).sqrt on complex numbers only
+   ///    
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
+   /// assert_eq!(result2, Complex::new(76.0, -42.0));
+   /// ```
+   pub fn norm_2(vec: &Vec<Complex<T>>) -> f64
+   where
+      T: Float + From<f64>,
+      f64: From<T>
+   {
+      let sum = vec.iter().fold(0.0, |acc, x| acc + f64::from((x.real() * x.real()) + (x.imag() * x.imag())));
+      sum.sqrt()
+   }
+
+   /// Frobenius norm of a complex matrix
+   ///    
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
+   /// assert_eq!(result2, Complex::new(76.0, -42.0));
+   /// ```
+   pub fn norm_frobenius(&self) -> f64
+   where
+      T: Float + From<f64>,
+      f64: From<T>
+   {
+      let sum = self.data.iter().fold(0.0, |acc, x| acc + f64::from((x.real() * x.real()) + (x.imag() * x.imag())));
+      sum.sqrt()
+   }
+
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// let result2 = Matrix::<Complex<f64>>::dot_product(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0)],&vec![Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
+   /// assert_eq!(result2, Complex::new(76.0, -42.0));
+   /// ```
+   pub fn dot_product(v1: &Vec<Complex<T>>, v2: &Vec<Complex<T>>) -> Complex<T>
+   where
+      T: Copy + Zero + Mul<Output = T>
+   {
+      v1.iter().zip(v2).fold(Complex::<T>::zero(), |acc, (&x, &y)| acc + x.conj() * y)
+   }
+   
+
+   /// Generate a complex matrix of a given dimension with randomized variable over a uniform distribution
+   /// 
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// let m_f64 = Matrix::<Complex<f64>>::rnd_complex_matrix(10, 9, 0.0..=1.0);
+   /// assert_eq!(m_f64.rows(), 10);
+   /// assert_eq!(m_f64.cols(), 9);
+   /// assert_eq!(m_f64.data().len(), 90);
+   /// ```
    pub fn rnd_complex_matrix( rows: u128, cols: u128, rnd: RangeInclusive<T> ) -> Self
    where 
       T: SampleUniform {
@@ -542,7 +616,15 @@ impl<T> Matrix<Complex<T>>
       Matrix::new(rows,cols,random_numbers)
    }
 
-   // Get the complex conjugate of a complex vector
+   /// Get the complex conjugate of a complex vector
+   /// 
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// let v_f64 = Matrix::<Complex<f64>>::vec_conj(vec![Complex::new(5.0, 3.0),Complex::new(2.0, -4.0),Complex::new(7.0, 1.0),Complex::new(9.0, -5.0)]);
+   /// assert_eq!(v_f64, vec![Complex::new(5.0, -3.0),Complex::new(2.0, 4.0),Complex::new(7.0, -1.0),Complex::new(9.0, 5.0)]);
+   /// ```
    pub fn vec_conj(v: Vec<Complex<T>>) -> Vec<Complex<T>> {
       v.iter().map(|x| Complex::new(x.real(),-x.imag())).collect()
    }
@@ -557,6 +639,7 @@ impl<T> Matrix<Complex<T>>
    }
 
    /// Check if a complex matrix is Hermitian/Self-adjoint - Charles Hermite 1855
+   #[allow(dead_code)]
    pub fn is_hermitian(self) -> bool {
       if self.clone().trans().conj() == self {
          true
@@ -580,10 +663,10 @@ impl<T> Matrix<Complex<T>>
 
       // For a given matrix A in the iteration;
       // Calc CHT for the first col vector
-      let mut A = mat.clone();
-      let mut CHT = Matrix::<Complex<T>>::householder_transform(A.col(1));
-      let mut R = CHT.clone(); // first time does not need a resize.
-      let mut Q = CHT.clone().trans().conj(); // complex conj transpose?
+      let mut mat_a = mat.clone();
+      let mut mat_cht = Matrix::<Complex<T>>::householder_transform(mat_a.col(1));
+      let mut mat_r = mat_cht.clone(); // first time does not need a resize.
+      let mut mat_q = mat_cht.clone().trans().conj(); // complex conj transpose?
 
       let mut start_index = 1;      
       let cycles = (mat.rows-1).min(mat.cols);
@@ -592,22 +675,22 @@ impl<T> Matrix<Complex<T>>
          // Begin iteration /////////////////////////////////////////////////////////////
 
          // Operate the CHT on the original matrix and get the sub-matrix
-         A = (CHT.clone() * A.clone()).sub_matrix(start_index+1..=A.rows, start_index+1..=A.cols);
+         mat_a = (mat_cht.clone() * mat_a.clone()).sub_matrix(start_index+1..=mat_a.rows, start_index+1..=mat_a.cols);
 
          // Calc CHT for first column vector and augment back to original matrix dimensions
-         CHT = Matrix::<Complex<T>>::householder_transform(A.col(1)).augment(start_index);
+         mat_cht = Matrix::<Complex<T>>::householder_transform(mat_a.col(1)).augment(start_index);
 
          // Augment A back to original dimensions
-         A = A.augment(start_index);
+         mat_a = mat_a.augment(start_index);
 
-         Q = Q * CHT.clone().trans().conj();
-         R = CHT.clone() * R;
+         mat_q = mat_q * mat_cht.clone().trans().conj();
+         mat_r = mat_cht.clone() * mat_r;
 
          start_index += 1;
 
          // End iteration ///////////////////////////////////////////////////////////////
       }
-      (Q,R*mat)
+      (mat_q,mat_r*mat)
    }
 
    /// Householder Transform for Complex Matrices (CHT)
@@ -622,7 +705,7 @@ impl<T> Matrix<Complex<T>>
             The CHT is applied to a column vector x to zero out all
             the elements except the first one. */
             
-            let x_norm_2 = norm_2(&x);
+            let x_norm_2 = Matrix::<Complex<T>>::norm_2(&x);
             let exp_jtheta_x1 = x[0]/(x[0]*x[0].conj()).sqrt();
             let mut u = x.clone();
             u[0] = x[0] + (exp_jtheta_x1 * x_norm_2);            
@@ -630,48 +713,47 @@ impl<T> Matrix<Complex<T>>
             let uh = Matrix::<Complex<T>>::vec_conj(u.clone());
             let uh_u: Complex<T> = dot_product(&uh, &u);
 
-            let uh_u_f64 = f64::from(uh_u.real());
+            //let uh_u_f64 = f64::from(uh_u.real());
 
             let u_uh: Matrix<Complex<T>> = cvec_rvec(&u,&uh);
             let u_uh_multipled_data:Vec<Complex<T>> = u_uh.data.iter().map(|x| Complex::<T>::new((Into::<T>::into(2.0)/uh_u.real()) * x.real(), (Into::<T>::into(2.0)/uh_u.real()) * x.imag())).collect();
-            let U_Uh = Matrix::new(x.len()as u128,x.len() as u128, u_uh_multipled_data);
-            let CHT = Matrix::<Complex<T>>::identity(x.len()) - U_Uh;      
+            let mat_u_uh = Matrix::new(x.len()as u128,x.len() as u128, u_uh_multipled_data);
+            let mat_cht = Matrix::<Complex<T>>::identity(x.len()) - mat_u_uh;      
 
-            CHT.unwrap()
+            mat_cht.unwrap()
          }
 
    
    /// Perform Schur decomposition on complex matrix
+   #[allow(dead_code)]
    pub fn schur(self, threshold: T) -> Self
    where 
-      T:Copy + Zero + Float + From<f64> + Debug,
+      T:Clone + Zero + Float + From<f64> + Debug,
       f64: From<T> + Mul<T>
    {
        // explicitly shifted QR algo with Rayleigh quotient shift
       let mut mat_a: Matrix<Complex<T>> = self;
-      //let mut mat_e: Matrix<Complex<T>> = Matrix::new(mat_a.rows,1,nth_identity_vector( mat_a.cols as usize, mat_a.cols as usize));
-      //let mut shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
-      //let mut intshift = shift[(1,1)];
-      //let mat_i = Matrix::<Complex<T>>::identity(mat_a.rows as usize);
-      //mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
-      
-      let (mut Q,mut R) = Matrix::<Complex<T>>::qr_cht(mat_a);
+
+      let (mut mat_q,mut mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a.clone());
+
+      let mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
 
       // update a
-      // mat_a = ((R.clone() * Q.clone()) + mat_i.clone().mul(intshift)).unwrap();
-      mat_a = R.clone() * Q.clone();
+      mat_a = mat_r.clone() * mat_q.clone();
       let mut max_iter = 1;
-      let mut epsilon = norm_2(&mat_a.skew_diag(-1)).magnitude();
+      let mut epsilon = Matrix::<Complex<T>>::norm_2(&mat_a.skew_diag(-1)).magnitude();
+
+
       while epsilon > threshold && max_iter < 1000 {
-         epsilon = norm_2(&mat_a.skew_diag(-1)).magnitude();
+         epsilon = Matrix::<Complex<T>>::norm_2(&mat_a.skew_diag(-1)).magnitude();
          println!("Epsilon: {:?} Threshold: {:?} Iter: {}", epsilon,threshold,max_iter);
          // start iteration
          //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
          //intshift = shift[(1,1)];
       // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
-         (Q,R) = Matrix::<Complex<T>>::qr_cht(mat_a);
+         (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a);
          //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
-         mat_a = R.clone() * Q.clone();
+         mat_a = mat_r.clone() * mat_q.clone();
          //println!("eval {}", mat_a)     ;
          // end iteration
          max_iter += 1;
@@ -679,7 +761,7 @@ impl<T> Matrix<Complex<T>>
 
       mat_a
    }
-
+   #[allow(dead_code)]
    pub fn eigen_2x2(self) -> (Complex<T>, Complex<T>)
    where
       T: From<f64>,
@@ -698,6 +780,7 @@ impl<T> Matrix<Complex<T>>
 
    /// Generalized eigenvalues - takes a complex Schur decomposition
    /// and finds all real and complex eigenvalues
+   #[allow(dead_code)]
    pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
    where 
       T: Float + From<f64>,
@@ -786,7 +869,7 @@ macro_rules! matrix {
                row_cols = 0;
             }       
          )*
-         Matrix::new(rows, first_row_cols as u128, data)  
+         crum::matrix::Matrix::new(rows, first_row_cols as u128, data)  
       }
    };
    
