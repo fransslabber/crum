@@ -550,12 +550,12 @@ impl<T> Matrix<Complex<T>>
    /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
    /// assert_eq!(result2, Complex::new(76.0, -42.0));
    /// ```
-   pub fn norm_2(vec: &Vec<Complex<T>>) -> f64
+   pub fn norm_2(vec: &Vec<Complex<T>>) -> Complex<T>
    where
       T: Float + From<f64>,
       f64: From<T>
    {
-      let sum = vec.iter().fold(0.0, |acc, x| acc + f64::from((x.real() * x.real()) + (x.imag() * x.imag())));
+      let sum = vec.iter().fold(Complex::<T>::zero(), |acc, x| acc + *x * x.conj());
       sum.sqrt()
    }
 
@@ -730,10 +730,10 @@ impl<T> Matrix<Complex<T>>
             The CHT is applied to a column vector x to zero out all
             the elements except the first one. */
             
-            let x_norm_2 = Complex::new(Matrix::<Complex<T>>::norm_2(&x),0.0);
+            let x_norm_2 = Matrix::<Complex<T>>::norm_2(&x);
             let exp_jtheta_x1 = x[0]/(x[0]*x[0].conj()).sqrt();
             let mut u = x.clone();
-            u[0] = x[0] + (exp_jtheta_x1);// * <Complex<T> as From>::from(x_norm_2));            
+            u[0] = x[0] + (exp_jtheta_x1 * x_norm_2);            
 
             let uh = Matrix::<Complex<T>>::vec_conj(u.clone());
             let uh_u: Complex<T> = dot_product(&uh, &u);
