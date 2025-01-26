@@ -3,7 +3,7 @@ use crate::complex::Complex;
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
-use num_traits::{Float, One, Zero};
+use num_traits::{Float, One, Zero,Signed};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
 
@@ -113,7 +113,7 @@ where
 }
 
 /// Define a generic matrix structure with data stored as row dominant
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Matrix<T> 
 {
    rows: u128,
@@ -304,9 +304,9 @@ impl<T: Clone + Copy> Matrix<T>
    #[allow(dead_code)]
    pub fn is_identity(&self) -> bool
    where 
-      T: One + PartialEq
+      T: One + PartialEq + Float
    {
-      (self.diag()).iter().all(|&x| x == T::one())
+      (self.diag()).iter().all(|&x| x.round() == T::one())
    }
 
    /// Set nth row of a matrix
@@ -542,7 +542,6 @@ impl<T> Matrix<Complex<T>>
       Matrix<Complex<T>>: PartialEq,
       T: Clone + Float + std::ops::Neg<Output = T>
 {
-
    /// norm of x of degree two(Frobenius Norm) = ||x||2 = ( x1 x∗1 + . . . + xk x∗k ).sqrt on complex numbers only
    ///    
    /// ```
@@ -651,6 +650,23 @@ impl<T> Matrix<Complex<T>>
    /// Do complex QR-decomposition using complex Householder Transforms
    /// Require rows >= cols.
    /// 
+   /// #Example
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// let m_complex_f64 = matrix![[      Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)],
+   ///                             [       Complex::new(0.19355221625091562,0.07443815946182132),  Complex::new(0.38523666576656257,0.6235838654566793),   Complex::new(0.5655998866671316,0.02796381067764698),   Complex::new(0.9478369597737368,0.5061665241108549),    Complex::new(0.9665277542211836,0.6464090293919905),Complex::new(0.8934413145999256,0.9928347855455917),    Complex::new(0.24012630465410162,0.4511339192624414),   Complex::new(0.0795066100131381,0.16804618159775966),   Complex::new(0.7154655006062255,0.27954112740219067),   Complex::new(0.8093795163995636,0.2647562871405445)     ],
+   ///                             [       Complex::new(0.722107408913046,0.3453081577838271),     Complex::new(0.8641742059855633,0.43503554725558835),   Complex::new(0.6576465324620399,0.07852371724975284),   Complex::new(0.38540857835795383,0.5959496185548973),   Complex::new(0.617794405196579,0.7206737924044645),Complex::new(0.5099081560147524,0.8617303081795931),     Complex::new(0.4464823442359144,0.45949602324474303),   Complex::new(0.35752646144365713,0.8983136848274984),   Complex::new(0.6077708116013137,0.6456302985283519),    Complex::new(0.15132177386470594,0.3335043031018719)    ],
+   ///                             [       Complex::new(0.8593850791476851,0.11354522137267689),   Complex::new(0.4938670101809314,0.7852216948857795),    Complex::new(0.23096625492908301,0.20830882216670715),  Complex::new(0.7400234625821275,0.4639399244725205),    Complex::new(0.5378937891759045,0.7037567515968549),Complex::new(0.2219390019576138,0.23209326206010134),   Complex::new(0.4558367952542631,0.9965121614070889),    Complex::new(0.39631631122312905,0.08633527991619407),  Complex::new(0.9443163419994178,0.42288025964849474),   Complex::new(0.2332370920018188,0.9922786240129193)     ],
+   ///                             [       Complex::new(0.41844631685477907,0.35277367066150905),  Complex::new(0.3475123609164877,0.7101826289551204),    Complex::new(0.5730063661284887,0.48196832299859105),   Complex::new(0.6143248737217993,0.18023274893317168),   Complex::new(0.26770558087500756,0.34859620475408054),      Complex::new(0.6573603929892361,0.09347808620771915),   Complex::new(0.559359670948789,0.7870570717326266),     Complex::new(0.5996313950882705,0.0578118744896874),    Complex::new(0.32955838142838695,0.6696041764734405),   Complex::new(0.21936429159910614,0.4952850734335351)],
+   ///                             [       Complex::new(0.009248256198125528,0.4527930011455513),  Complex::new(0.6849305389546144,0.12102884187585097),   Complex::new(0.4165174797405674,0.9462171528526406),    Complex::new(0.8619475196821003,0.7381751595031852),    Complex::new(0.7596450684070042,0.33049863177437794),       Complex::new(0.37937891021432113,0.0938634467267199),   Complex::new(0.046313554311124834,0.8748186202857586),  Complex::new(0.9142747660514274,0.1720666151092736),    Complex::new(0.1155038542568945,0.8407799452002931),    Complex::new(0.6036564509415651,0.1549954601684234)],
+   ///                             [       Complex::new(0.5280435825255948,0.722128687058149),     Complex::new(0.2958172383395739,0.21101513922732212),   Complex::new(0.6247036944583212,0.2958591539645528),    Complex::new(0.8771245810505679,0.9876277069779977),    Complex::new(0.13778026369279453,0.2925863129303102),       Complex::new(0.6689687280137598,0.24661000255739168),   Complex::new(0.19090555403974846,0.1626089128725561),   Complex::new(0.5354601189785831,0.701258765248206),     Complex::new(0.09332523997739807,0.8382042501840465),   Complex::new(0.12250427701915115,0.7540059801921637)],
+   ///                             [       Complex::new(0.641212141487291,0.12028843766751154),    Complex::new(0.5573689686134607,0.9281730407924285),    Complex::new(0.18228923797612165,0.937966839425133),    Complex::new(0.290229469308307,0.3447329019990513),     Complex::new(0.29421063475530934,0.7783426202185895),       Complex::new(0.2986058932928953,0.8937034310271619),    Complex::new(0.25710953476086523,0.896262417185731),    Complex::new(0.8847389180993006,0.254408582006775),     Complex::new(0.027617968349187068,0.29285850298797206), Complex::new(0.029426361218854565,0.6879945477458963)       ],
+   ///                             [       Complex::new(0.23945753093683192,0.30616733782992506),  Complex::new(0.9881588754627659,0.6754586092988201),    Complex::new(0.6279846571645774,0.07795290055819983),   Complex::new(0.9880650206914865,0.43754117662346503),   Complex::new(0.5668252086231756,0.5654418870268184),Complex::new(0.9563427957776676,0.44960614238550123),   Complex::new(0.8250656417870632,0.5513468135978378),    Complex::new(0.9851555697862651,0.3608225406879005),    Complex::new(0.07324290749628194,0.358150639141774),    Complex::new(0.27138526608582186,0.19393235694918426)   ],
+   ///                             [       Complex::new(0.08899561873929575,0.6885237168549837),   Complex::new(0.6759656028808306,0.16861078919167818),   Complex::new(0.14192833304987176,0.14780523687381544),  Complex::new(0.7793249757513581,0.7530672142302),       Complex::new(0.7685456523065339,0.3380067105229064),Complex::new(0.07062494877030058,0.406943551307159),    Complex::new(0.6391551970178856,0.5412405648127648),    Complex::new(0.5005075046812791,0.3967310304417494),    Complex::new(0.15753551096333432,0.4919072076795531),   Complex::new(0.09696298494836111,0.6188849576238623)    ]];
+   /// 
+   /// 
+   /// ``` 
    pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
    where
    T:Copy + Zero + Float + From<f64>,
@@ -694,6 +710,15 @@ impl<T> Matrix<Complex<T>>
    }
 
    /// Householder Transform for Complex Matrices (CHT)
+   /// 
+   /// #Example
+   /// ```
+   /// let m_complex_f64 = vec![Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)];
+   /// let cht = Matrix::<Complex<f64>>::householder_transform(m_complex_f64);
+   /// assert!(cht.clone().is_hermitian());
+   /// assert!((cht.clone() * cht.clone().conj().trans()).is_identity());
+   /// 
+   /// ```
    pub fn householder_transform(x: Vec<Complex<T>>) -> Self
       where
          T:Copy + Zero + Float + From<f64>,
@@ -705,10 +730,10 @@ impl<T> Matrix<Complex<T>>
             The CHT is applied to a column vector x to zero out all
             the elements except the first one. */
             
-            let x_norm_2 = Matrix::<Complex<T>>::norm_2(&x);
+            let x_norm_2 = Complex::new(Matrix::<Complex<T>>::norm_2(&x),0.0);
             let exp_jtheta_x1 = x[0]/(x[0]*x[0].conj()).sqrt();
             let mut u = x.clone();
-            u[0] = x[0] + (exp_jtheta_x1 * x_norm_2);            
+            u[0] = x[0] + (exp_jtheta_x1);// * <Complex<T> as From>::from(x_norm_2));            
 
             let uh = Matrix::<Complex<T>>::vec_conj(u.clone());
             let uh_u: Complex<T> = dot_product(&uh, &u);
@@ -726,35 +751,34 @@ impl<T> Matrix<Complex<T>>
    
    /// Perform Schur decomposition on complex matrix
    #[allow(dead_code)]
-   pub fn schur(self, threshold: T) -> Self
+   pub fn schur(self, threshold: f64) -> Self
    where 
       T:Clone + Zero + Float + From<f64> + Debug,
       f64: From<T> + Mul<T>
    {
-       // explicitly shifted QR algo with Rayleigh quotient shift
+      // explicitly shifted QR algo with Rayleigh quotient shift
       let mut mat_a: Matrix<Complex<T>> = self;
-
+      // QR decompose matrix
       let (mut mat_q,mut mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a.clone());
-
-      let mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
+      // Set up residual
+      let mut mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
 
       // update a
       mat_a = mat_r.clone() * mat_q.clone();
       let mut max_iter = 1;
-      let mut epsilon = Matrix::<Complex<T>>::norm_2(&mat_a.skew_diag(-1)).magnitude();
-
+      let mut epsilon = Matrix::<Complex<T>>::norm_frobenius(&mut_residual.unwrap());
 
       while epsilon > threshold && max_iter < 1000 {
-         epsilon = Matrix::<Complex<T>>::norm_2(&mat_a.skew_diag(-1)).magnitude();
          println!("Epsilon: {:?} Threshold: {:?} Iter: {}", epsilon,threshold,max_iter);
          // start iteration
          //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
          //intshift = shift[(1,1)];
-      // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
+         // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
          (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a);
          //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
          mat_a = mat_r.clone() * mat_q.clone();
          //println!("eval {}", mat_a)     ;
+         mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
          // end iteration
          max_iter += 1;
       }
@@ -841,7 +865,6 @@ impl<T> Matrix<Complex<T>>
 
 /// Matrix create macro matrix![[x,y,...],[a,b,...],[c,d,...],...]
 #[macro_export]
-#[allow(unused_assignments)]
 macro_rules! matrix {
    // Match rows and columns   
    ( $(  [$($x:expr),* ]   ),*) => {
@@ -971,6 +994,33 @@ impl<T: Display +Clone> Display for Matrix<T> {
             write!(f, "\t]").expect("Not Written");
          } else {
             write!(f, "\t]\n").expect("Not Written");
+         }
+         
+      }
+      write!(f, "]").expect("Not Written");
+      Ok(())
+   }
+}
+
+impl<T: Display + Copy> Debug for Matrix<Complex<T>>
+{
+
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+   {
+      write!(f, "\n[").expect("Not Written");
+      for row_idx in 1..=self.rows{         
+         write!(f, "[").expect("Not Written");
+         for col_idx in 1..=self.cols {
+            if col_idx == self.cols {
+               write!(f, "\tComplex::new({},{})", self[(row_idx,col_idx)].real(),self[(row_idx,col_idx)].imag()).expect("Not Written");
+            } else {
+               write!(f, "\tComplex::new({},{}),", self[(row_idx,col_idx)].real(),self[(row_idx,col_idx)].imag()).expect("Not Written");
+            }
+         }
+         if row_idx == self.rows {
+            write!(f, "\t]").expect("Not Written");
+         } else {
+            write!(f, "\t],\n").expect("Not Written");
          }
          
       }
