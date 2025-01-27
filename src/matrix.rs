@@ -1,6 +1,6 @@
 use crate::complex::Complex;
 
-use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
+use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub,};
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
 use num_traits::{Float, One, Zero,Signed};
@@ -284,7 +284,64 @@ impl<T: Clone + Copy> Matrix<T>
       data
    }
 
+   fn round_to_decimal_places(value: T, decimal_places: u32) -> T
+   where 
+      T: Float {
+      let factor = T::from(10).unwrap().powi(decimal_places as i32);
+      (value * factor).round() / factor
+   }
+   
+   /// Are all the elements below the diagonal zero to a given precision.
+   pub fn is_upper_triang(&self, precision: f64) -> bool
+   where 
+      T: Clone + Float {
+      assert_eq!(self.cols, self.rows, "Matrix must be square.");
+      
+      self.data
+            .iter()
+            .enumerate()
+            .skip( self.cols as usize)
+            .step_by((self.cols) as usize)
+            .filter_map(|(start_idx, _)| {
+               if start_idx < self.data.len() - self.cols as usize {
+                  Some(self.data[start_idx..start_idx + (start_idx/self.cols as usize) - 1].to_vec())
+               } else {
+                  None
+               }})
+            .flatten()
+            .all(|x|   Matrix::<T>::round_to_decimal_places(x,12) <  T::from(precision).unwrap())
+   }
+
+   /// Are all the elements below the diagonal zero to a given precision.
+   pub fn is_lower_triang(&self, precision: f64) -> bool
+   where 
+      T: Clone + Float {
+      assert_eq!(self.cols, self.rows, "Matrix must be square.");
+      
+      self.data
+            .iter()
+            .enumerate()
+            .step_by((self.cols) as usize)
+            .filter_map(|(start_idx, _)| {
+               if start_idx < (self.data.len() - self.cols() as usize) {
+                  Some(self.data[(start_idx  + (start_idx/self.cols as usize + 1))..(start_idx + self.cols as usize)].to_vec())
+               } else {
+                  None
+               }})
+            .flatten()
+            .all(|x| Matrix::<T>::round_to_decimal_places(x,12) <  T::from(precision).unwrap())
+   }
+
    /// Construct a n x n identity matrix
+   /// Example
+   /// ```
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let m_id = Matrix::<Complex<f64>>::identity(10);
+   /// assert!(Matrix::<Complex<f64>>::is_identity(&m_id, 1e-15));
+   /// assert_eq!(m_id.rows(),m_id.cols())
+   /// 
+   /// ```
    pub fn identity(dimen: usize) -> Self
    where 
       T: Zero + One      
@@ -300,13 +357,19 @@ impl<T: Clone + Copy> Matrix<T>
       identity
    }
 
-   /// Check if matrix is identity matrix
+   /// Check if matrix is identity matrix by confirming that main diagonal is identity 1
+   /// and it satisfies both upper and lower triangular requirements
    #[allow(dead_code)]
-   pub fn is_identity(&self) -> bool
+   pub fn is_identity(&self,precision: f64) -> bool
    where 
       T: One + PartialEq + Float
-   {
-      (self.diag()).iter().all(|&x| x.round() == T::one())
+   {     
+      assert_eq!(self.cols, self.rows, "Matrix must be square.");
+      if self.is_lower_triang(precision ) && self. is_upper_triang(precision) {
+         (self.diag()).iter().all(|&x| Matrix::<T>::round_to_decimal_places( (T::one() - x).abs(),12) <  T::from(precision).unwrap() )
+      } else {
+         false
+      }      
    }
 
    /// Set nth row of a matrix
@@ -494,46 +557,74 @@ impl<T: Clone + Copy> Matrix<T>
       Matrix::new(rows,cols,random_numbers)
    }
 
+   pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
+   where 
+      T: Float + From<f64>,
+      f64: From<T> + Mul<T>
+   {
+      assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
+      let mut eigen_values_real = Vec::<T>::new();
+      let mut eigen_values_complex = Vec::<Complex<T>>::new();
+
+
+      // // set real-complex split threshold
+      // let threshold = Complex::new(<T as From<f64>>::from(0.001),<T as From<f64>>::from(0.001)).magnitude();
+
+      // // Process diagonal : if block then complex conjugate eigen pair, if not then real eigen value
+      // // For each elem(ij), if elem(i+1,j) == zero, then elem(ij) is a real eigen value, and skip 1 diag elem, else;
+      // // the 2x2 sub-matrix i..i+1 x j..j+1 has complex conjugate eigenvalue pairs.
+
+      // let mut row_idx = 1_u128;
+      // let mut col_idx = 1_u128;
+
+      // while row_idx <= self.rows {
+      //    while col_idx <= self.cols {
+
+      //       if row_idx == self.rows && col_idx == self.cols {
+      //          //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+      //          eigen_values_real.push(self[(row_idx,col_idx)].real());
+      //          row_idx += 1;
+      //          col_idx += 1;
+      //       } else{
+      //          if self[(row_idx+1,col_idx)].magnitude() <= threshold {
+      //             //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+      //             eigen_values_real.push(self[(row_idx,col_idx)].real());
+      //             row_idx += 1;
+      //             col_idx += 1;
+
+      //          } else {
+      //             let schur_sub = self.sub_matrix(row_idx as u128..= (row_idx+1)  as u128, col_idx as u128..=(col_idx+1) as u128);
+      //             let (lambda1,lambda2) = Matrix::eigen_2x2(schur_sub);
+      //             // Check if we have a complex conjugate pair
+      //             if lambda1.conj() == lambda2 {
+      //                //println!("eigen complex: {} {}",lambda1,lambda2 );
+      //                eigen_values_complex.push(lambda1);
+      //                eigen_values_complex.push(lambda2);
+      //                row_idx += 2; col_idx += 2;
+      //             } else {
+      //                eigen_values_real.push(self[(row_idx,col_idx)].real());
+      //                row_idx += 1;
+      //                col_idx += 1;                     
+      //             }
+      //          }
+      //       }
+      //    }
+      // }
+      (eigen_values_real,eigen_values_complex)
+   }
+
+   fn mul(self, other: T) -> Self
+   where 
+      T: Float {
+      Self {
+         rows: self.rows,
+         cols: self.cols,
+         data: self.data.iter().map(|&x| x*other).collect()
+      }
+   }
+
 }
 
-
-
-// impl<T> Matrix<T> {
-//    // QR Decomposition - Gram-Schmidt
-//    pub fn qr_decomp_gs(&self) ->(Self,Self)
-//       where
-//          T:Copy + Zero + Float
-//          {
-//             let mut q = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
-//             let mut r = Matrix::new(self.rows, self.cols, vec![T::zero(); (self.rows*self.cols) as usize ]);
-//             // For each column in self
-//             // Define vector as a n x 1 matrix
-//             for i in 1..=self.cols {
-//                let mut col_i = self.col(i);
-
-//                // Orthogonalize the current column against all preceding columns
-//                for j in 1..=i {
-//                   let col_j = self.col(j);
-//                   let r_ji = dot_product(&col_j, &col_i);
-
-//                   r[(j,i)] = r_ji; 
-                  
-//                   col_i = vector_sub(&col_j,&scalar_mul(&col_j,r_ji));
-
-//                }
-
-//                // Normalize column
-//                let norm = magnitude(&col_i);
-//                r[(i,i)] = norm; 
-//                col_i = scalar_div(&col_i,norm);
-            
-//                // set as ith column of Q matrix
-//                q = q.clone().col_set(i, col_i);
-//             }
-//             (q,r)
-//          }
-
-// }
 
 
 /// Complex Matrix Specializations
@@ -559,7 +650,7 @@ impl<T> Matrix<Complex<T>>
       sum.sqrt()
    }
 
-   /// Frobenius norm of a complex matrix
+   /// norm of x of degree two(Frobenius Norm) of a complex matrix
    ///    
    /// ```
    /// use crum::matrix::Matrix;
@@ -567,12 +658,12 @@ impl<T> Matrix<Complex<T>>
    /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
    /// assert_eq!(result2, Complex::new(76.0, -42.0));
    /// ```
-   pub fn norm_frobenius(&self) -> f64
+   pub fn norm_2_mat(&self) -> Complex<T>
    where
       T: Float + From<f64>,
       f64: From<T>
    {
-      let sum = self.data.iter().fold(0.0, |acc, x| acc + f64::from((x.real() * x.real()) + (x.imag() * x.imag())));
+      let sum = self.data.iter().fold(Complex::<T>::zero(), |acc, x| acc + acc + *x * x.conj());
       sum.sqrt()
    }
 
@@ -653,6 +744,7 @@ impl<T> Matrix<Complex<T>>
    /// #Example
    /// ```
    /// use crum::matrix;
+   /// use crum::matrix::Matrix;
    /// use crum::complex::Complex;
    /// let m_complex_f64 = matrix![[      Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)],
    ///                             [       Complex::new(0.19355221625091562,0.07443815946182132),  Complex::new(0.38523666576656257,0.6235838654566793),   Complex::new(0.5655998866671316,0.02796381067764698),   Complex::new(0.9478369597737368,0.5061665241108549),    Complex::new(0.9665277542211836,0.6464090293919905),Complex::new(0.8934413145999256,0.9928347855455917),    Complex::new(0.24012630465410162,0.4511339192624414),   Complex::new(0.0795066100131381,0.16804618159775966),   Complex::new(0.7154655006062255,0.27954112740219067),   Complex::new(0.8093795163995636,0.2647562871405445)     ],
@@ -665,6 +757,10 @@ impl<T> Matrix<Complex<T>>
    ///                             [       Complex::new(0.23945753093683192,0.30616733782992506),  Complex::new(0.9881588754627659,0.6754586092988201),    Complex::new(0.6279846571645774,0.07795290055819983),   Complex::new(0.9880650206914865,0.43754117662346503),   Complex::new(0.5668252086231756,0.5654418870268184),Complex::new(0.9563427957776676,0.44960614238550123),   Complex::new(0.8250656417870632,0.5513468135978378),    Complex::new(0.9851555697862651,0.3608225406879005),    Complex::new(0.07324290749628194,0.358150639141774),    Complex::new(0.27138526608582186,0.19393235694918426)   ],
    ///                             [       Complex::new(0.08899561873929575,0.6885237168549837),   Complex::new(0.6759656028808306,0.16861078919167818),   Complex::new(0.14192833304987176,0.14780523687381544),  Complex::new(0.7793249757513581,0.7530672142302),       Complex::new(0.7685456523065339,0.3380067105229064),Complex::new(0.07062494877030058,0.406943551307159),    Complex::new(0.6391551970178856,0.5412405648127648),    Complex::new(0.5005075046812791,0.3967310304417494),    Complex::new(0.15753551096333432,0.4919072076795531),   Complex::new(0.09696298494836111,0.6188849576238623)    ]];
    /// 
+   /// let (q,r) = Matrix::<_>::qr_cht(m_complex_f64);
+   /// assert!(Matrix::<Complex<f64>>::is_upper_triang(&r, 1e-15));
+   /// assert!(Matrix::<Complex<f64>>::is_identity(&(q.clone() * q.clone().conj().trans()), 1e-15));
+   /// assert!(Matrix::<Complex<f64>>::is_identity(&(q.clone().conj().trans() * q.clone()), 1e-15));
    /// 
    /// ``` 
    pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
@@ -710,21 +806,22 @@ impl<T> Matrix<Complex<T>>
    }
 
    /// Householder Transform for Complex Matrices (CHT)
-   /// 
+   /// Non-unique
    /// #Example
    /// ```
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
    /// let m_complex_f64 = vec![Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)];
    /// let cht = Matrix::<Complex<f64>>::householder_transform(m_complex_f64);
    /// assert!(cht.clone().is_hermitian());
-   /// assert!((cht.clone() * cht.clone().conj().trans()).is_identity());
+   /// assert!((cht.clone() * cht.clone().conj().trans()).is_identity(1e-15));
    /// 
    /// ```
    pub fn householder_transform(x: Vec<Complex<T>>) -> Self
       where
          T:Copy + Zero + Float + From<f64>,
          f64: From<T> + Mul<T>
-         {
-            //println!("x {:?}", x);
+         {            
             /* When the elements of the matrix are complex numbers, 
             it is denoted the Complex Householder Transform (CHT).
             The CHT is applied to a column vector x to zero out all
@@ -748,43 +845,61 @@ impl<T> Matrix<Complex<T>>
             mat_cht.unwrap()
          }
 
+
    
    /// Perform Schur decomposition on complex matrix
+   /// The complex eigenvalues of the complex matrix is the diagonal elements
+   /// of the Schur transform matrix and can be retrieved by calling .diag()
+   /// #Example
+   /// ```
+   /// let m_complex_f64 = matrix![[      Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)],
+   ///[       Complex::new(0.19355221625091562,0.07443815946182132),  Complex::new(0.38523666576656257,0.6235838654566793),   Complex::new(0.5655998866671316,0.02796381067764698),   Complex::new(0.9478369597737368,0.5061665241108549),    Complex::new(0.9665277542211836,0.6464090293919905),Complex::new(0.8934413145999256,0.9928347855455917),    Complex::new(0.24012630465410162,0.4511339192624414),   Complex::new(0.0795066100131381,0.16804618159775966),   Complex::new(0.7154655006062255,0.27954112740219067),   Complex::new(0.8093795163995636,0.2647562871405445)     ],
+   ///[       Complex::new(0.722107408913046,0.3453081577838271),     Complex::new(0.8641742059855633,0.43503554725558835),   Complex::new(0.6576465324620399,0.07852371724975284),   Complex::new(0.38540857835795383,0.5959496185548973),   Complex::new(0.617794405196579,0.7206737924044645),Complex::new(0.5099081560147524,0.8617303081795931),     Complex::new(0.4464823442359144,0.45949602324474303),   Complex::new(0.35752646144365713,0.8983136848274984),   Complex::new(0.6077708116013137,0.6456302985283519),    Complex::new(0.15132177386470594,0.3335043031018719)    ],
+   ///[       Complex::new(0.8593850791476851,0.11354522137267689),   Complex::new(0.4938670101809314,0.7852216948857795),    Complex::new(0.23096625492908301,0.20830882216670715),  Complex::new(0.7400234625821275,0.4639399244725205),    Complex::new(0.5378937891759045,0.7037567515968549),Complex::new(0.2219390019576138,0.23209326206010134),   Complex::new(0.4558367952542631,0.9965121614070889),    Complex::new(0.39631631122312905,0.08633527991619407),  Complex::new(0.9443163419994178,0.42288025964849474),   Complex::new(0.2332370920018188,0.9922786240129193)     ],
+   ///[       Complex::new(0.41844631685477907,0.35277367066150905),  Complex::new(0.3475123609164877,0.7101826289551204),    Complex::new(0.5730063661284887,0.48196832299859105),   Complex::new(0.6143248737217993,0.18023274893317168),   Complex::new(0.26770558087500756,0.34859620475408054),      Complex::new(0.6573603929892361,0.09347808620771915),   Complex::new(0.559359670948789,0.7870570717326266),     Complex::new(0.5996313950882705,0.0578118744896874),    Complex::new(0.32955838142838695,0.6696041764734405),   Complex::new(0.21936429159910614,0.4952850734335351)],
+   ///[       Complex::new(0.009248256198125528,0.4527930011455513),  Complex::new(0.6849305389546144,0.12102884187585097),   Complex::new(0.4165174797405674,0.9462171528526406),    Complex::new(0.8619475196821003,0.7381751595031852),    Complex::new(0.7596450684070042,0.33049863177437794),       Complex::new(0.37937891021432113,0.0938634467267199),   Complex::new(0.046313554311124834,0.8748186202857586),  Complex::new(0.9142747660514274,0.1720666151092736),    Complex::new(0.1155038542568945,0.8407799452002931),    Complex::new(0.6036564509415651,0.1549954601684234)],
+   ///[       Complex::new(0.5280435825255948,0.722128687058149),     Complex::new(0.2958172383395739,0.21101513922732212),   Complex::new(0.6247036944583212,0.2958591539645528),    Complex::new(0.8771245810505679,0.9876277069779977),    Complex::new(0.13778026369279453,0.2925863129303102),       Complex::new(0.6689687280137598,0.24661000255739168),   Complex::new(0.19090555403974846,0.1626089128725561),   Complex::new(0.5354601189785831,0.701258765248206),     Complex::new(0.09332523997739807,0.8382042501840465),   Complex::new(0.12250427701915115,0.7540059801921637)],
+   ///[       Complex::new(0.641212141487291,0.12028843766751154),    Complex::new(0.5573689686134607,0.9281730407924285),    Complex::new(0.18228923797612165,0.937966839425133),    Complex::new(0.290229469308307,0.3447329019990513),     Complex::new(0.29421063475530934,0.7783426202185895),       Complex::new(0.2986058932928953,0.8937034310271619),    Complex::new(0.25710953476086523,0.896262417185731),    Complex::new(0.8847389180993006,0.254408582006775),     Complex::new(0.027617968349187068,0.29285850298797206), Complex::new(0.029426361218854565,0.6879945477458963)       ],
+   ///[       Complex::new(0.23945753093683192,0.30616733782992506),  Complex::new(0.9881588754627659,0.6754586092988201),    Complex::new(0.6279846571645774,0.07795290055819983),   Complex::new(0.9880650206914865,0.43754117662346503),   Complex::new(0.5668252086231756,0.5654418870268184),Complex::new(0.9563427957776676,0.44960614238550123),   Complex::new(0.8250656417870632,0.5513468135978378),    Complex::new(0.9851555697862651,0.3608225406879005),    Complex::new(0.07324290749628194,0.358150639141774),    Complex::new(0.27138526608582186,0.19393235694918426)   ],
+   ///[       Complex::new(0.08899561873929575,0.6885237168549837),   Complex::new(0.6759656028808306,0.16861078919167818),   Complex::new(0.14192833304987176,0.14780523687381544),  Complex::new(0.7793249757513581,0.7530672142302),       Complex::new(0.7685456523065339,0.3380067105229064),Complex::new(0.07062494877030058,0.406943551307159),    Complex::new(0.6391551970178856,0.5412405648127648),    Complex::new(0.5005075046812791,0.3967310304417494),    Complex::new(0.15753551096333432,0.4919072076795531),   Complex::new(0.09696298494836111,0.6188849576238623)    ]];
+   /// let schur = Matrix::<_>::schur(&m_complex_f64, 1e-12);
+   /// 
+   /// ```
    #[allow(dead_code)]
-   pub fn schur(self, threshold: f64) -> Self
+   pub fn schur(&self, precision: f64) -> Self
    where 
-      T:Clone + Zero + Float + From<f64> + Debug,
+      T:Clone + Zero + Float + From<f64> + Debug + Signed,
       f64: From<T> + Mul<T>
    {
-      // explicitly shifted QR algo with Rayleigh quotient shift
-      let mut mat_a: Matrix<Complex<T>> = self;
-      // QR decompose matrix
-      let (mut mat_q,mut mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a.clone());
-      // Set up residual
-      let mut mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
+      let mut mat_a: Matrix<Complex<T>> = self.clone();
+      let mut sub_diag = vec![Complex::<T>::zero(); (self.clone().rows() - 1) as usize];
+      let mut count_iter = 1;
+      //let mut epsilon = Complex::new(T::zero(),T::zero());
 
-      // update a
-      mat_a = mat_r.clone() * mat_q.clone();
-      let mut max_iter = 1;
-      let mut epsilon = Matrix::<Complex<T>>::norm_frobenius(&mut_residual.unwrap());
+      while count_iter < 10000 {
 
-      while epsilon > threshold && max_iter < 1000 {
-         println!("Epsilon: {:?} Threshold: {:?} Iter: {}", epsilon,threshold,max_iter);
-         // start iteration
-         //shift = mat_e.clone().trans() * mat_a.clone() * mat_e.clone();
-         //intshift = shift[(1,1)];
-         // mat_a = (mat_a - mat_i.clone().mul(intshift)).unwrap();      
-         (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a);
-         //mat_a = ((R * Q) + mat_i.clone().mul(intshift)).unwrap();
+         // let (lambda1,lambda2) = mat_a.sub_matrix(self.rows - 2..=self.rows, self.cols - 2..=self.cols).eigen_2x2();
+         // if (lambda1 - mat_a[(self.rows,self.cols)]).magnitude() <= (lambda2 - mat_a[(self.rows,self.cols)]).magnitude() {
+         //    epsilon = lambda1;
+         // } else{
+         //    epsilon = lambda2;
+         // }
+         //let shift_wilkinson = Matrix::<Complex<T>>::identity(self.rows() as usize).mul(epsilon);
+         let (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a);
          mat_a = mat_r.clone() * mat_q.clone();
-         //println!("eval {}", mat_a)     ;
-         mut_residual = mat_a.clone() - (mat_q.clone() * mat_r.clone() * mat_q.clone().conj().trans());
-         // end iteration
-         max_iter += 1;
-      }
 
+         // Compare sub-diagonal for convergence
+         if mat_a.skew_diag(-1).iter().zip(sub_diag.clone()).all(|(a,b)| (a.magnitude() - b.magnitude()).abs().to_f64().unwrap() < precision ) == true {
+            break;
+         };
+         sub_diag = mat_a.skew_diag(-1);
+         count_iter += 1;
+      }
+      println!("Final Iter Count: {}",count_iter);
       mat_a
    }
+
+
    #[allow(dead_code)]
    pub fn eigen_2x2(self) -> (Complex<T>, Complex<T>)
    where
@@ -800,65 +915,6 @@ impl<T> Matrix<Complex<T>>
       let lambda2 = (Complex::from(trace) - discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
 
       (lambda1, lambda2)
-   }
-
-   /// Generalized eigenvalues - takes a complex Schur decomposition
-   /// and finds all real and complex eigenvalues
-   #[allow(dead_code)]
-   pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
-   where 
-      T: Float + From<f64>,
-      f64: From<T> + Mul<T>
-   {
-      assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
-      let mut eigen_values_real = Vec::<T>::new();
-      let mut eigen_values_complex = Vec::<Complex<T>>::new();
-
-
-      // set real-complex split threshold
-      let threshold = Complex::new(<T as From<f64>>::from(0.001),<T as From<f64>>::from(0.001)).magnitude();
-
-      // Process diagonal : if block then complex conjugate eigen pair, if not then real eigen value
-      // For each elem(ij), if elem(i+1,j) == zero, then elem(ij) is a real eigen value, and skip 1 diag elem, else;
-      // the 2x2 sub-matrix i..i+1 x j..j+1 has complex conjugate eigenvalue pairs.
-
-      let mut row_idx = 1_u128;
-      let mut col_idx = 1_u128;
-
-      while row_idx <= self.rows {
-         while col_idx <= self.cols {
-
-            if row_idx == self.rows && col_idx == self.cols {
-               //println!("eigen real: {}",schur[(row_idx,col_idx)]);
-               eigen_values_real.push(self[(row_idx,col_idx)].real());
-               row_idx += 1;
-               col_idx += 1;
-            } else{
-               if self[(row_idx+1,col_idx)].magnitude() <= threshold {
-                  //println!("eigen real: {}",schur[(row_idx,col_idx)]);
-                  eigen_values_real.push(self[(row_idx,col_idx)].real());
-                  row_idx += 1;
-                  col_idx += 1;
-
-               } else {
-                  let schur_sub = self.sub_matrix(row_idx as u128..= (row_idx+1)  as u128, col_idx as u128..=(col_idx+1) as u128);
-                  let (lambda1,lambda2) = Matrix::eigen_2x2(schur_sub);
-                  // Check if we have a complex conjugate pair
-                  if lambda1.conj() == lambda2 {
-                     //println!("eigen complex: {} {}",lambda1,lambda2 );
-                     eigen_values_complex.push(lambda1);
-                     eigen_values_complex.push(lambda2);
-                     row_idx += 2; col_idx += 2;
-                  } else {
-                     eigen_values_real.push(self[(row_idx,col_idx)].real());
-                     row_idx += 1;
-                     col_idx += 1;                     
-                  }
-               }
-            }
-         }
-      }
-      (eigen_values_real,eigen_values_complex)
    }
 
 }
@@ -965,21 +1021,6 @@ impl<T> Mul for Matrix<T>
    }
 }
 
-// Implement scalar * matrix multiplication
-impl<T> Mul<T> for Matrix<T>
-where 
-   T: Copy + Mul<Output = T>
-{
-   type Output = Self;
-
-   fn mul(self, other: T) -> Self {
-      Self {
-         rows: self.rows,
-         cols: self.cols,
-         data: self.data.iter().map(|&x| x*other).collect()
-      }
-   }
-}
 
 /// Display a matrix sensibly
 impl<T: Display +Clone> Display for Matrix<T> {

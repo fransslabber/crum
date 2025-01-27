@@ -2,7 +2,7 @@ use num_traits::{Float, Num, NumCast, One, Signed, ToPrimitive, Zero};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign,Rem};
 use std::fmt::Display;
 use std::iter::Sum;
-//use rand::distributions::{Distribution, Standard};
+use std::vec::Vec;
 
 // Define a generic Complex structure
 #[derive(Debug, Clone, Copy, PartialEq,PartialOrd)]
@@ -56,7 +56,7 @@ where
    }
 }
 
-/// Implement the + trait for Complex<T>
+/// Implement the + trait for Complex\<T\>
 ///
 /// # Arguments
 ///
@@ -689,30 +689,17 @@ impl<T: Display + Clone + Signed + PartialOrd> Display for Complex<T> {
    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
       if self.imag < T::zero() {
          if self.real < T::zero() {
-            write!(f, "{} - i{}", format!("{:5.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
+            write!(f, "{} - i{}", format!("{:5.4}",self.real.clone()), format!("{:4.4}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
          } else {
-            write!(f, " {} - i{}", format!("{:4.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written");
+            write!(f, " {} - i{}", format!("{:4.4}",self.real.clone()), format!("{:4.4}",num_traits::abs(self.imag.clone()))).expect("Not Written");
          }
       } else {
          if self.real < T::zero() {
-            write!(f, "{} + i{}", format!("{:5.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
+            write!(f, "{} + i{}", format!("{:5.4}",self.real.clone()), format!("{:4.4}",num_traits::abs(self.imag.clone()))).expect("Not Written"); 
          } else {
-            write!(f, " {} + i{}", format!("{:4.2}",self.real.clone()), format!("{:4.2}",num_traits::abs(self.imag.clone()))).expect("Not Written");
+            write!(f, " {} + i{}", format!("{:4.4}",self.real.clone()), format!("{:4.4}",num_traits::abs(self.imag.clone()))).expect("Not Written");
          }
       }
       Ok(())
    }
 }
-
-// impl<T> Distribution<Complex<T>> for Standard
-// where 
-//    T: rand::Rng + Zero + PartialEq {
-//    fn sample<R: rand::Rng + ?Sized>(&self, rng: &mut R) -> Complex<T> {
-//       Complex {
-//          real: rng.gen_range(Complex::<T>::zero()..100),
-//          imag: rng.gen_range(0.0..1.0),
-//       }
-//    }
-// }
-
-
