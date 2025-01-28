@@ -8,8 +8,8 @@ repository = "https://github.com/fransslabber/crum"
 readme = "README.md"
 keywords = ["complexnumbers", "complexmatrix","numericalanalysis","mathematics"]
 categories = ["mathematics", "science"]
-documentation = "www.gaiamathematica.net/crum"
-homepage = "www.gaiamathematica.net"
+documentation = "http://www.gaiamathematica.net/crum"
+homepage = "http://www.gaiamathematica.net"
 
 [dependencies]
 num-traits = "0.2.19"
