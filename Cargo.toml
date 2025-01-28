@@ -2,6 +2,14 @@
 name = "crum"
 version = "0.1.0"
 edition = "2021"
+license = "MIT OR Apache-2.0"
+description = "Complex numbers and matrices for numerical analysis."
+repository = "https://github.com/fransslabber/crum"
+readme = "README.md"
+keywords = ["complexnumbers", "complexmatrix","numericalanalysis","mathematics"]
+categories = ["mathematics", "science"]
+documentation = "www.gaiamathematica.net/crum"
+homepage = "www.gaiamathematica.net"
 
 [dependencies]
 num-traits = "0.2.19"
