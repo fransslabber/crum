@@ -333,6 +333,15 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Construct a n x n identity matrix
+   ///
+   /// # Arguments
+   ///
+   /// * `dimen` - f64.
+   ///
+   /// # Returns
+   ///
+   /// The `dimen` x `dimen` identity matrix of type T.
+   ///
    /// Example
    /// ```
    /// use crum::complex::Complex;
@@ -358,7 +367,25 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Check if matrix is identity matrix by confirming that main diagonal is identity 1
-   /// and it satisfies both upper and lower triangular requirements
+   /// and it satisfies both upper and lower triangular requirements.
+   ///
+   /// # Arguments
+   ///
+   /// * `&self` - the matrix.
+   /// * `precision` - f64.
+   ///
+   /// # Returns
+   ///
+   /// The bool result comparing with T::zero() and T::one() to required precision.
+   ///
+   /// # Example
+   /// ```
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let m_identity_4_4 = Matrix::<Complex<f64>>::identity(4);
+   /// assert!(m_identity_4_4.is_identity(1e-12)); 
+   /// 
+   /// ```
    #[allow(dead_code)]
    pub fn is_identity(&self,precision: f64) -> bool
    where 
@@ -373,45 +400,77 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Set nth row of a matrix
+   ///
+   /// # Arguments
+   ///
+   /// * `self` - Mutable reference to this matrix.
+   /// * `idx` - Row index to be replaced, 1-based.
+   /// * `row` - Vector of type T to replace row in matrix.
+   ///
+   /// # Returns
+   ///
+   /// # Example
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let mut m_complex_f  = matrix![[Complex::new(0.0, 0.0), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+   ///                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 0.0), Complex::new(2.0, -5.0)],
+   ///                                 [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 0.0)]];
+   /// let replacement = vec![Complex::new(5.5, 6.6), Complex::new(4.0, 0.0), Complex::new(2.0, 9.0)];
+   /// m_complex_f.row_set(2,replacement);
+   /// assert!(m_complex_f[(2,1)] == Complex::new(5.5, 6.6) 
+   ///      && m_complex_f[(2,2)] == Complex::new(4.0, 0.0) 
+   ///      && m_complex_f[(2,3)] == Complex::new(2.0, 9.0));
+   /// 
+   /// ```
    #[allow(dead_code)]
-   pub fn row_set(self, idx: u128, row: Vec<T>) -> Self
-   where 
-      {
-
-      let mut data= self.data;
-      data.splice((self.cols *(idx - 1)) as usize..((self.cols *(idx - 1))+self.cols) as usize,row);      
- 
-      Self {
-         rows: self.rows,
-         cols: self.cols,
-         data: data.to_vec()
-      }
+   pub fn row_set(&mut self, idx: u128, row: Vec<T>)
+   {
+      assert_eq!(row.len(),self.cols() as usize, "Replacement row must be of length number of matrix columns.");
+      let _ = &self.data.splice((self.cols *(idx - 1)) as usize..((self.cols *(idx - 1))+self.cols) as usize,row);     
    }   
 
    /// Set nth col of a matrix
+   ///
+   /// # Arguments
+   ///
+   /// * `self` - Mutable reference to this matrix.
+   /// * `idx` - Column index to be replaced, 1-based.
+   /// * `row` - Vector of type T to replace column in matrix.
+   ///
+   /// # Returns
+   ///
+   /// # Example
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let mut m_complex_f  = matrix![[Complex::new(0.0, 0.0), Complex::new(6.1, -4.0), Complex::new(3.0, -4.0)],
+   ///                                 [Complex::new(6.1, 4.0), Complex::new(1.0, 0.0), Complex::new(2.0, -5.0)],
+   ///                                 [Complex::new(3.0, 4.0), Complex::new(2.0, 5.0), Complex::new(2.0, 0.0)]];
+   /// let replacement = vec![Complex::new(5.5, 6.6), Complex::new(4.0, 0.0), Complex::new(2.0, 9.0)];
+   /// m_complex_f.col_set(2,replacement);
+   /// assert!(m_complex_f[(1,2)] == Complex::new(5.5, 6.6) 
+   ///      && m_complex_f[(2,2)] == Complex::new(4.0, 0.0) 
+   ///      && m_complex_f[(3,2)] == Complex::new(2.0, 9.0));
+   /// 
+   /// ``` 
    #[allow(dead_code)]
-   pub fn col_set(self, idx: u128, col: Vec<T>) -> Self
-   where 
-      {
-      let mut data= self.data;      
-      let vec_iter = data
-      .iter_mut()  // mutable iterator over the vector
-      .skip((idx - 1) as usize)  // Skip the first elements
-      .step_by(self.cols as usize);
-      
-      let mut index:usize = 0;
-      for x in vec_iter{
-         *x = col[index].clone();
-         index += 1;
-      }
-
-      Self {
-         rows: self.rows,
-         cols: self.cols,
-         data: data.to_vec()
-      }
-   
-}
+   pub fn col_set(&mut self, idx: u128, col: Vec<T>)
+      {    
+         assert_eq!(col.len(),self.rows() as usize, "Replacement column must be of length number of matrix rows.");
+         let vec_iter = self.data
+         .iter_mut()  // mutable iterator over the vector
+         .skip((idx - 1) as usize)  // Skip the first elements
+         .step_by(self.cols as usize);
+         
+         let mut index:usize = 0;
+         for x in vec_iter{
+            *x = col[index].clone();
+            index += 1;
+         }
+   }
 
    /// Get matrix data as Vec; row dominant
    #[allow(dead_code)]
@@ -432,6 +491,29 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Transpose of a matrix
+   ///
+   /// # Arguments
+   ///
+   /// * `self` - This matrix.
+   ///
+   /// # Returns
+   ///
+   /// The new transposed matrix.
+   ///
+   /// # Example
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let mat = matrix![
+   ///    [1.0, 2.0, 7.0],
+   ///    [3.0, 4.0, 8.0]];
+   /// let mat_trans = mat.trans();
+   /// 
+   /// assert!(mat_trans[(3,1)] == 7.0
+   ///      && mat_trans[(3,2)] == 8.0);
+   /// 
+   /// ``` 
    pub fn trans(self) -> Self {   
 
       let mut result_vec: Vec<T> = Vec::with_capacity((self.rows*self.cols) as usize);
@@ -449,6 +531,36 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
    /// Extract sub-matrix from matrix by specifying a row range and column range
+   /// ///
+   /// # Arguments
+   ///
+   /// * `self` - This matrix.
+   /// * `rows` - Inclusive range of one-based row indices.
+   /// * `cols` - Inclusive range of one-based column indices.
+   ///
+   /// # Returns
+   ///
+   /// The new sub-matrix.
+   ///
+   /// # Example
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   /// let m_f64 = matrix![[      0.4130613594781728,      0.06789616787771548,     0.9656690602669977,      0.935185936307158,       0.36917500405507325],  
+   ///                     [       0.243168572454519     ,  0.31261293138410245   ,  0.5252879127056232   ,   0.0330935153674985    ,  0.9753704689278127],  
+   ///                     [       0.41435210063956374   ,  0.2399665922965562    ,  0.9561861714688091   ,   0.697771062293815     ,  0.010276832821779937],
+   ///                     [       0.011234519442551607  ,  0.3769729167821171    ,  0.3831601028613202   ,   0.9278273814572322    ,  0.5884363505264488],  
+   ///                     [       0.22699699307514926   ,  0.30855453813133443   ,  0.704016327682634    ,   0.9993467239797109    ,  0.5789833380097665],  
+   ///                     [       0.46588910028585306   ,  0.5638014697165844    ,  0.17953318066016835  ,   0.8848724908721202    ,  0.31679387457452873], 
+   ///                     [       0.6519277647881355    ,  0.38278755861532476   ,  0.537292424163817    ,   0.6468661089689082    ,  0.34068558363646023], 
+   ///                     [       0.554723676204958     ,  0.7331917287295512    ,  0.4119117955980295   ,   0.03440648890443177   ,  0.2875483259617025],  
+   ///                     [       0.35148199904388605   ,  0.06203799828471969   ,  0.3318123341812714   ,   0.474823312748173     ,  0.6748846353426651],  
+   ///                     [       0.35208686528649485   ,  0.08035514071119178   ,  0.9146101290660322   ,   0.20577219168723354   ,  0.6125322396803093]]; 
+   /// let m_f64_sub = m_f64.sub_matrix(3..=7, 2..=4);
+   /// assert!(m_f64_sub.rows() == 5 && m_f64_sub.cols() == 3);
+   /// assert!(m_f64_sub[(1,1)] == 0.2399665922965562 && m_f64_sub[(5,3)] == 0.6468661089689082);
+   /// ```  
    pub fn sub_matrix(&self, rows: RangeInclusive<u128>,cols: RangeInclusive<u128> ) -> Self
    where 
       T: Zero
@@ -563,8 +675,8 @@ impl<T: Clone + Copy> Matrix<T>
       f64: From<T> + Mul<T>
    {
       assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
-      let mut eigen_values_real = Vec::<T>::new();
-      let mut eigen_values_complex = Vec::<Complex<T>>::new();
+      let eigen_values_real = Vec::<T>::new();
+      let eigen_values_complex = Vec::<Complex<T>>::new();
 
 
       // // set real-complex split threshold
@@ -613,6 +725,7 @@ impl<T: Clone + Copy> Matrix<T>
       (eigen_values_real,eigen_values_complex)
    }
 
+   #[allow(dead_code)]
    fn mul(self, other: T) -> Self
    where 
       T: Float {
@@ -639,7 +752,7 @@ impl<T> Matrix<Complex<T>>
    /// use crum::matrix::Matrix;
    /// use crum::complex::Complex;
    /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
-   /// assert_eq!(result2, Complex::new(76.0, -42.0));
+   /// assert_eq!(result2, Complex::new(14.491376746189438, 0.0));
    /// ```
    pub fn norm_2(vec: &Vec<Complex<T>>) -> Complex<T>
    where
@@ -655,8 +768,6 @@ impl<T> Matrix<Complex<T>>
    /// ```
    /// use crum::matrix::Matrix;
    /// use crum::complex::Complex;
-   /// let result2 = Matrix::<Complex<f64>>::norm_2(&vec![Complex::new(5.0, 3.0),Complex::new(2.0, 4.0),Complex::new(7.0, 1.0),Complex::new(9.0, 5.0)]);
-   /// assert_eq!(result2, Complex::new(76.0, -42.0));
    /// ```
    pub fn norm_2_mat(&self) -> Complex<T>
    where
@@ -683,6 +794,16 @@ impl<T> Matrix<Complex<T>>
 
    /// Generate a complex matrix of a given dimension with randomized variable over a uniform distribution
    /// 
+   /// # Arguments
+   ///
+   /// * `rows` - Number of rows as u128.
+   /// * `cols` - Number of cols as u128.
+   /// * `rnd`  - Random number inclusive range.
+   ///
+   /// # Returns
+   ///
+   /// The new matrix.
+   ///
    /// #Example   
    /// ```
    /// use crum::matrix::Matrix;
@@ -708,6 +829,14 @@ impl<T> Matrix<Complex<T>>
 
    /// Get the complex conjugate of a complex vector
    /// 
+   /// # Arguments
+   ///
+   /// * `v` - Complex vector Vec of type Complex\<T\>.
+   ///
+   /// # Returns
+   ///
+   /// Complex vector Vec of type Complex\<T\>.
+   ///
    /// #Example   
    /// ```
    /// use crum::matrix::Matrix;
@@ -719,7 +848,21 @@ impl<T> Matrix<Complex<T>>
       v.iter().map(|x| Complex::new(x.real(),-x.imag())).collect()
    }
    
-   // Get the complex conjugate of a complex matrix
+   /// Get the complex conjugate of a complex matrix
+   /// 
+   /// # Arguments
+   ///
+   /// * `self` - This complex matrix.
+   ///
+   /// # Returns
+   ///
+   /// New complex matrix of type Complex\<T\>.
+   ///
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::complex::Complex;
+   /// ```
    pub fn conj(self) -> Self {
       Self {
          rows: self.cols,
@@ -741,6 +884,14 @@ impl<T> Matrix<Complex<T>>
    /// Do complex QR-decomposition using complex Householder Transforms
    /// Require rows >= cols.
    /// 
+   /// # Arguments
+   ///
+   /// * `self` - This complex matrix.
+   ///
+   /// # Returns
+   ///
+   /// New complex matrix pair Q and R, where Q is unitary and R is upper trangular.
+   ///
    /// #Example
    /// ```
    /// use crum::matrix;
@@ -757,31 +908,31 @@ impl<T> Matrix<Complex<T>>
    ///                             [       Complex::new(0.23945753093683192,0.30616733782992506),  Complex::new(0.9881588754627659,0.6754586092988201),    Complex::new(0.6279846571645774,0.07795290055819983),   Complex::new(0.9880650206914865,0.43754117662346503),   Complex::new(0.5668252086231756,0.5654418870268184),Complex::new(0.9563427957776676,0.44960614238550123),   Complex::new(0.8250656417870632,0.5513468135978378),    Complex::new(0.9851555697862651,0.3608225406879005),    Complex::new(0.07324290749628194,0.358150639141774),    Complex::new(0.27138526608582186,0.19393235694918426)   ],
    ///                             [       Complex::new(0.08899561873929575,0.6885237168549837),   Complex::new(0.6759656028808306,0.16861078919167818),   Complex::new(0.14192833304987176,0.14780523687381544),  Complex::new(0.7793249757513581,0.7530672142302),       Complex::new(0.7685456523065339,0.3380067105229064),Complex::new(0.07062494877030058,0.406943551307159),    Complex::new(0.6391551970178856,0.5412405648127648),    Complex::new(0.5005075046812791,0.3967310304417494),    Complex::new(0.15753551096333432,0.4919072076795531),   Complex::new(0.09696298494836111,0.6188849576238623)    ]];
    /// 
-   /// let (q,r) = Matrix::<_>::qr_cht(m_complex_f64);
-   /// assert!(Matrix::<Complex<f64>>::is_upper_triang(&r, 1e-15));
+   /// let (q,r) = m_complex_f64.qr_cht();
+   /// assert!(r.is_upper_triang(1e-15));
    /// assert!(Matrix::<Complex<f64>>::is_identity(&(q.clone() * q.clone().conj().trans()), 1e-15));
    /// assert!(Matrix::<Complex<f64>>::is_identity(&(q.clone().conj().trans() * q.clone()), 1e-15));
    /// 
    /// ``` 
-   pub fn qr_cht(mat: Matrix<Complex<T>>) -> (Self,Self)
+   pub fn qr_cht(&self) -> (Self,Self)
    where
    T:Copy + Zero + Float + From<f64>,
    f64: From<T> + Mul<T>
    {
-      assert!(mat.rows >= mat.cols, "CHT for QR only valid when rows >= cols.");
+      assert!(self.rows >= self.cols, "CHT for QR only valid when rows >= cols.");
       // Column by column build the Q and R matrices of A such
       // that Q R = A and Q has orthonormal column vectors 
       // and R is an upper diagonal matrix
 
       // For a given matrix A in the iteration;
       // Calc CHT for the first col vector
-      let mut mat_a = mat.clone();
+      let mut mat_a = self.clone();
       let mut mat_cht = Matrix::<Complex<T>>::householder_transform(mat_a.col(1));
       let mut mat_r = mat_cht.clone(); // first time does not need a resize.
       let mut mat_q = mat_cht.clone().trans().conj(); // complex conj transpose?
 
       let mut start_index = 1;      
-      let cycles = (mat.rows-1).min(mat.cols);
+      let cycles = (self.rows-1).min(self.cols);
 
       while start_index < cycles { // Remember, we have already done one iteration above
          // Begin iteration /////////////////////////////////////////////////////////////
@@ -802,7 +953,7 @@ impl<T> Matrix<Complex<T>>
 
          // End iteration ///////////////////////////////////////////////////////////////
       }
-      (mat_q,mat_r*mat)
+      (mat_q,mat_r*self.clone())
    }
 
    /// Householder Transform for Complex Matrices (CHT)
@@ -843,15 +994,29 @@ impl<T> Matrix<Complex<T>>
             let mat_cht = Matrix::<Complex<T>>::identity(x.len()) - mat_u_uh;      
 
             mat_cht.unwrap()
-         }
-
-
+   }
    
-   /// Perform Schur decomposition on complex matrix
-   /// The complex eigenvalues of the complex matrix is the diagonal elements
-   /// of the Schur transform matrix and can be retrieved by calling .diag()
+   /// Perform Schur decomposition on a square complex matrix
+   /// The complex eigenvalues of the complex matrix are the diagonal elements
+   /// of the Schur transform matrix and can be retrieved by calling .diag().
+   /// The Schur transform for a complex matrix is an upper triangular matrix.
+   ///
+   /// # Arguments
+   ///
+   /// * `self` - This complex matrix.
+   /// * `precision` - Required trace elements precision. 
+   ///
+   /// # Returns
+   ///
+   /// A Result with Ok - complex Schur transform of the matrix, with diagonal reduced to given precision,
+   /// and the associated unitary matrix with eigenvectors as columns.
+   /// And Err message if maximum iterations are exceeded before convergence to required precision has occurred.
+   ///
    /// #Example
    /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
    /// let m_complex_f64 = matrix![[      Complex::new(0.5833556123799982,0.5690181027600784),    Complex::new(0.6886043600138049,0.674390821408502),     Complex::new(0.24687850063786915,0.5935898903765723),   Complex::new(0.00933456816360523,0.6587484783595824),   Complex::new(0.23512331858462204,0.15986594969605908),      Complex::new(0.3592667599232367,0.044091292164025304),  Complex::new(0.9128331393696729,0.1833852110584138),    Complex::new(0.5180466720472582,0.05333044453605408),   Complex::new(0.26564558002149125,0.24744281386070038),  Complex::new(0.5795439760266531,0.7097323035461603)],
    ///[       Complex::new(0.19355221625091562,0.07443815946182132),  Complex::new(0.38523666576656257,0.6235838654566793),   Complex::new(0.5655998866671316,0.02796381067764698),   Complex::new(0.9478369597737368,0.5061665241108549),    Complex::new(0.9665277542211836,0.6464090293919905),Complex::new(0.8934413145999256,0.9928347855455917),    Complex::new(0.24012630465410162,0.4511339192624414),   Complex::new(0.0795066100131381,0.16804618159775966),   Complex::new(0.7154655006062255,0.27954112740219067),   Complex::new(0.8093795163995636,0.2647562871405445)     ],
    ///[       Complex::new(0.722107408913046,0.3453081577838271),     Complex::new(0.8641742059855633,0.43503554725558835),   Complex::new(0.6576465324620399,0.07852371724975284),   Complex::new(0.38540857835795383,0.5959496185548973),   Complex::new(0.617794405196579,0.7206737924044645),Complex::new(0.5099081560147524,0.8617303081795931),     Complex::new(0.4464823442359144,0.45949602324474303),   Complex::new(0.35752646144365713,0.8983136848274984),   Complex::new(0.6077708116013137,0.6456302985283519),    Complex::new(0.15132177386470594,0.3335043031018719)    ],
@@ -863,14 +1028,24 @@ impl<T> Matrix<Complex<T>>
    ///[       Complex::new(0.23945753093683192,0.30616733782992506),  Complex::new(0.9881588754627659,0.6754586092988201),    Complex::new(0.6279846571645774,0.07795290055819983),   Complex::new(0.9880650206914865,0.43754117662346503),   Complex::new(0.5668252086231756,0.5654418870268184),Complex::new(0.9563427957776676,0.44960614238550123),   Complex::new(0.8250656417870632,0.5513468135978378),    Complex::new(0.9851555697862651,0.3608225406879005),    Complex::new(0.07324290749628194,0.358150639141774),    Complex::new(0.27138526608582186,0.19393235694918426)   ],
    ///[       Complex::new(0.08899561873929575,0.6885237168549837),   Complex::new(0.6759656028808306,0.16861078919167818),   Complex::new(0.14192833304987176,0.14780523687381544),  Complex::new(0.7793249757513581,0.7530672142302),       Complex::new(0.7685456523065339,0.3380067105229064),Complex::new(0.07062494877030058,0.406943551307159),    Complex::new(0.6391551970178856,0.5412405648127648),    Complex::new(0.5005075046812791,0.3967310304417494),    Complex::new(0.15753551096333432,0.4919072076795531),   Complex::new(0.09696298494836111,0.6188849576238623)    ]];
    /// let schur = Matrix::<_>::schur(&m_complex_f64, 1e-12);
-   /// 
+   /// let schur_result = match schur {
+   ///    Ok(value) => value,
+   ///    Err(e) => {
+   ///       println!("Error: {}", e);
+   ///       return; // Exit the function early if there's an error
+   ///   }
+   /// };
+   /// schur_result.0.diag().iter().for_each(|x| println!("{:?}",x));
+   /// assert!(schur_result.0.diag()[0] == Complex::new(4.863674157977457,4.730078401818301) );
    /// ```
    #[allow(dead_code)]
-   pub fn schur(&self, precision: f64) -> Self
+   pub fn schur(&self, precision: f64) -> Result<(Self,Self),String>
    where 
       T:Clone + Zero + Float + From<f64> + Debug + Signed,
       f64: From<T> + Mul<T>
    {
+      assert_eq!(self.rows,self.cols,"Matrix must be a square matrix.");
+
       let mut mat_a: Matrix<Complex<T>> = self.clone();
       let mut sub_diag = vec![Complex::<T>::zero(); (self.clone().rows() - 1) as usize];
       let mut count_iter = 1;
@@ -885,18 +1060,17 @@ impl<T> Matrix<Complex<T>>
          //    epsilon = lambda2;
          // }
          //let shift_wilkinson = Matrix::<Complex<T>>::identity(self.rows() as usize).mul(epsilon);
-         let (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(mat_a);
+         let (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(&mat_a);
          mat_a = mat_r.clone() * mat_q.clone();
 
          // Compare sub-diagonal for convergence
          if mat_a.skew_diag(-1).iter().zip(sub_diag.clone()).all(|(a,b)| (a.magnitude() - b.magnitude()).abs().to_f64().unwrap() < precision ) == true {
-            break;
+            return Ok((mat_a,mat_q));
          };
          sub_diag = mat_a.skew_diag(-1);
          count_iter += 1;
       }
-      println!("Final Iter Count: {}",count_iter);
-      mat_a
+      Err(String::from("Maximum iteration (10000) exceeded to converge to Schur transform at desired precision"))
    }
 
 
