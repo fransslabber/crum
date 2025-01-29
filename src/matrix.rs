@@ -1,8 +1,10 @@
 use crate::complex::Complex;
+use crate::matrix;
 
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub,};
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
+use num_traits::float::FloatCore;
 use num_traits::{Float, One, Zero,Signed};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
@@ -667,6 +669,102 @@ impl<T: Clone + Copy> Matrix<T>
          .collect();
 
       Matrix::new(rows,cols,random_numbers)
+   }
+
+/* INPUT: A - array of pointers to rows of a square matrix having dimension N
+ *        Tol - small tolerance number to detect failure when the matrix is near degenerate
+ * OUTPUT: Matrix A is changed, it contains a copy of both matrices L-E and U as A=(L-E)+U such that P*A=L*U.
+ *        The permutation matrix is not stored as a matrix, but in an integer vector P of size N+1 
+ *        containing column indexes where the permutation matrix has "1". The last element P[N]=S+N, 
+ *        where S is the number of row exchanges needed for determinant computation, det(P)=(-1)^S    
+
+int LUPDecompose(double **A, int N, double Tol, int *P) {
+
+   int i, j, k, imax; 
+   double maxA, *ptr, absA;
+
+   for (i = 0; i <= N; i++)
+       P[i] = i; //Unit permutation matrix, P[N] initialized with N
+
+   for (i = 0; i < N; i++) {
+      maxA = 0.0;
+      imax = i;
+
+      for (k = i; k < N; k++)
+         if ((absA = fabs(A[k][i])) > maxA) { 
+            maxA = absA;
+            imax = k;
+         }
+
+      if (maxA < Tol) return 0; //failure, matrix is degenerate
+
+      if (imax != i) {
+         //pivoting P
+         j = P[i];
+         P[i] = P[imax];
+         P[imax] = j;
+
+         //pivoting rows of A
+         ptr = A[i];
+         A[i] = A[imax];
+         A[imax] = ptr;
+
+         //counting pivots starting from N (for determinant)
+         P[N]++;
+      }
+
+      for (j = i + 1; j < N; j++) {
+         A[j][i] /= A[i][i];
+
+         for (k = i + 1; k < N; k++)
+            A[j][k] -= A[j][i] * A[i][k];
+      }
+   }
+
+   return 1;  //decomposition done 
+}
+ */
+   pub fn swap_rows(&mut self, row1_idx: usize, row2_idx:usize) -> &Self
+   where 
+      T: Float + Debug + Display
+   {
+      assert!( (((row1_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len());
+      assert!( (((row2_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len());
+
+      // row2 -> row1
+      let row1:Vec<T> = self.data.splice( (row1_idx-1)*self.cols as usize..((row1_idx-1)*self.cols as usize) + self.cols as usize,
+      self.data[((row2_idx-1) * self.cols as usize)..((row2_idx-1) * self.cols as usize) + self.cols as usize].to_vec()).collect();
+      // row1 -> row2
+      self.data.splice(((row2_idx-1)*self.cols as usize)..((row2_idx-1)*self.cols as usize) + self.cols as usize,
+      row1);
+
+      self
+   }
+
+
+   pub fn lu(&self, precision: f64) -> (Self,Self) 
+   where
+      T: Float 
+   {
+      let mut mat_p = Matrix::<T>::identity(self.rows as usize);
+      let mut mat_a = self;
+
+      // Start Iteration
+
+      // check for max value in 1st column
+
+      // Swap 1 row with any other row so that a_11 is max and non zero
+
+      // Swap same rows in identity matrix p
+
+      // adjust ALL rows BENEATH diagonal element a11 as follows:
+      // row_k = row_k - row_1 * a_k1/a_11
+
+
+
+
+
+      (mat_a,mat_p)
    }
 
    pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
