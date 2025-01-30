@@ -2,12 +2,14 @@ use crate::complex::Complex;
 use crate::matrix;
 
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub,};
+use std::slice::IterMut;
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
 use num_traits::float::FloatCore;
 use num_traits::{Float, One, Zero,Signed};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
+use std::iter::Skip;
 
 ///
 /// Some linear algebra operations on vector quantities
@@ -726,10 +728,10 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
  */
    pub fn swap_rows(&mut self, row1_idx: usize, row2_idx:usize) -> &Self
    where 
-      T: Float + Debug + Display
+      T: Float
    {
-      assert!( (((row1_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len());
-      assert!( (((row2_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len());
+      assert!( (((row1_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len(),"Matrix dimensions exceeded! {} <= {}",(((row1_idx-1)*self.cols as usize)+ self.cols as usize),self.data.len());
+      assert!( (((row2_idx-1)*self.cols as usize)+ self.cols as usize) <= self.data.len(),"Matrix dimensions exceeded! {} <= {}",(((row2_idx-1)*self.cols as usize)+ self.cols as usize),self.data.len());
 
       // row2 -> row1
       let row1:Vec<T> = self.data.splice( (row1_idx-1)*self.cols as usize..((row1_idx-1)*self.cols as usize) + self.cols as usize,
@@ -742,29 +744,51 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
    }
 
 
-   pub fn lu(&self, precision: f64) -> (Self,Self) 
+   pub fn lu(&mut self, precision: f64) -> (Self,Self) 
    where
-      T: Float 
+      T: Float + Display
    {
-      let mut mat_p = Matrix::<T>::identity(self.rows as usize);
-      let mut mat_a = self;
+      let mut mat_p = Matrix::<T>::identity(self.rows as usize); // permutation matrix
+      let mut mat_a = self; // original
+      let mut rows_swaps = 0;
+      let ncols = mat_a.cols as usize;
 
       // Start Iteration
+      for diag_idx in 1..ncols { //mat_a.rows as usize {
+         // check for max value in 1st column
+         let (max_row_idx_vec, max_diag_elem) = mat_a.data.clone().into_iter().enumerate().skip(diag_idx + (diag_idx-1)*ncols).step_by(ncols).reduce(|acc,x| if acc.1.abs() < x.1.abs() {x} else {acc}).unwrap();
+         let max_row_idx = max_row_idx_vec/mat_a.rows as usize;
+         println!("max row index {} element {}", max_row_idx,max_diag_elem);
+         if max_diag_elem != T::zero() {
+            if diag_idx != max_row_idx {
+               // Swap k row with max row so that a_diag_idxdiag_idx is max and non zero
+               mat_a.swap_rows(diag_idx, max_row_idx);
+               // Swap same rows in identity matrix p
+               mat_p.swap_rows(diag_idx, max_row_idx);
+               rows_swaps += 1;
+            }
 
-      // check for max value in 1st column
+            // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
+            // row_k = row_k - row_1 * a_k1/a_11            
+            let row_diag_idx: Vec<T> =  mat_a.row(diag_idx as u128).iter().cloned().collect();
+            
+            
+            for beneath_diag_idx in diag_idx..ncols {
+               let elimination_fraction = mat_a[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/mat_a[((diag_idx) as u128,(diag_idx) as u128)];
+               println!("ef {}/{}", mat_a[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],mat_a[((diag_idx) as u128,(diag_idx) as u128)]);
+               let mut replacement_row_iter = row_diag_idx.iter()
+                                                                  .enumerate()                                                                  
+                                                                  .zip(mat_a.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
 
-      // Swap 1 row with any other row so that a_11 is max and non zero
 
-      // Swap same rows in identity matrix p
-
-      // adjust ALL rows BENEATH diagonal element a11 as follows:
-      // row_k = row_k - row_1 * a_k1/a_11
-
-
-
-
-
-      (mat_a,mat_p)
+               while let Some(elem) = replacement_row_iter.next()  {
+                  println!("idx {} ef {} old {} new {}", elem.0.0,elimination_fraction, *elem.1, *elem.1 - (elimination_fraction * *elem.0.1) );
+                  *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+               }
+            }
+         }
+      }
+      (mat_a.clone(),mat_p)
    }
 
    pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
