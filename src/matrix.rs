@@ -673,60 +673,7 @@ impl<T: Clone + Copy> Matrix<T>
       Matrix::new(rows,cols,random_numbers)
    }
 
-/* INPUT: A - array of pointers to rows of a square matrix having dimension N
- *        Tol - small tolerance number to detect failure when the matrix is near degenerate
- * OUTPUT: Matrix A is changed, it contains a copy of both matrices L-E and U as A=(L-E)+U such that P*A=L*U.
- *        The permutation matrix is not stored as a matrix, but in an integer vector P of size N+1 
- *        containing column indexes where the permutation matrix has "1". The last element P[N]=S+N, 
- *        where S is the number of row exchanges needed for determinant computation, det(P)=(-1)^S    
-
-int LUPDecompose(double **A, int N, double Tol, int *P) {
-
-   int i, j, k, imax; 
-   double maxA, *ptr, absA;
-
-   for (i = 0; i <= N; i++)
-       P[i] = i; //Unit permutation matrix, P[N] initialized with N
-
-   for (i = 0; i < N; i++) {
-      maxA = 0.0;
-      imax = i;
-
-      for (k = i; k < N; k++)
-         if ((absA = fabs(A[k][i])) > maxA) { 
-            maxA = absA;
-            imax = k;
-         }
-
-      if (maxA < Tol) return 0; //failure, matrix is degenerate
-
-      if (imax != i) {
-         //pivoting P
-         j = P[i];
-         P[i] = P[imax];
-         P[imax] = j;
-
-         //pivoting rows of A
-         ptr = A[i];
-         A[i] = A[imax];
-         A[imax] = ptr;
-
-         //counting pivots starting from N (for determinant)
-         P[N]++;
-      }
-
-      for (j = i + 1; j < N; j++) {
-         A[j][i] /= A[i][i];
-
-         for (k = i + 1; k < N; k++)
-            A[j][k] -= A[j][i] * A[i][k];
-      }
-   }
-
-   return 1;  //decomposition done 
-}
- */
-   pub fn swap_rows(&mut self, row1_idx: usize, row2_idx:usize) -> &Self
+   pub fn swap_rows(&mut self, row1_idx: usize, row2_idx:usize)
    where 
       T: Float
    {
@@ -738,57 +685,111 @@ int LUPDecompose(double **A, int N, double Tol, int *P) {
       self.data[((row2_idx-1) * self.cols as usize)..((row2_idx-1) * self.cols as usize) + self.cols as usize].to_vec()).collect();
       // row1 -> row2
       self.data.splice(((row2_idx-1)*self.cols as usize)..((row2_idx-1)*self.cols as usize) + self.cols as usize,
-      row1);
-
-      self
+      row1);      
    }
 
 
-   pub fn lu(&mut self, precision: f64) -> (Self,Self) 
+   pub fn determinant_lu(&self, p: &Self, swaps: u32) -> T
+   where 
+      T: Float
+      {
+         let mut det = T::one();
+         for elem in self.diag().iter(){
+            det=det**elem;
+         }
+         if swaps % 2 == 0 {det} else {-det} 
+      }
+   
+   /// LU Decompose a matrix
+   /// Output is L-E and U as A=(L-E)+U such that P*A=L*U.
+   pub fn lu(mut self, precision: f64) -> Result<(Self,Self,Self,u32),String> 
    where
-      T: Float + Display
+      T: Float + Display + Debug,
    {
       let mut mat_p = Matrix::<T>::identity(self.rows as usize); // permutation matrix
-      let mut mat_a = self; // original
-      let mut rows_swaps = 0;
-      let ncols = mat_a.cols as usize;
+      let mut rows_swaps = 0_u32;
+      let ncols = self.cols as usize;
+      let nrows = self.rows as usize;
+      let mut mat_l = Matrix::<T>::new(self.rows,self.cols,vec![T::zero();ncols*nrows]); // lower triangular matrix
+
+      assert_eq!(ncols,nrows,"Matrix must be square.");
 
       // Start Iteration
-      for diag_idx in 1..ncols { //mat_a.rows as usize {
-         // check for max value in 1st column
-         let (max_row_idx_vec, max_diag_elem) = mat_a.data.clone().into_iter().enumerate().skip(diag_idx + (diag_idx-1)*ncols).step_by(ncols).reduce(|acc,x| if acc.1.abs() < x.1.abs() {x} else {acc}).unwrap();
-         let max_row_idx = max_row_idx_vec/mat_a.rows as usize;
-         println!("max row index {} element {}", max_row_idx,max_diag_elem);
-         if max_diag_elem != T::zero() {
+      for diag_idx in 1..ncols {
+
+         // check for max value in relevant column
+         //println!("diag_idx {} skip {} step {}",diag_idx,diag_idx-1 + (diag_idx-1)*ncols,ncols);
+         let (max_row_idx_vec, max_diag_elem) = self.data.iter()
+                                                                     .enumerate()
+                                                                     .skip(diag_idx-1 + (diag_idx-1)*ncols)
+                                                                     .step_by(ncols).
+                                                                     reduce(|acc,x| if acc.1.abs() < x.1.abs() {x} else {acc})
+                                                                     .unwrap();
+         let max_row_idx = (max_row_idx_vec/nrows) + 1;
+         let max_element = *max_diag_elem;
+         //println!("max row offset {} max row index {} element {}",max_row_idx_vec, max_row_idx,max_diag_elem);
+         
+         
+         if max_element.to_f64().unwrap() > precision {
             if diag_idx != max_row_idx {
                // Swap k row with max row so that a_diag_idxdiag_idx is max and non zero
-               mat_a.swap_rows(diag_idx, max_row_idx);
+               let top_row:Vec<T> = self.data.splice(((max_row_idx-1) * ncols)..((max_row_idx-1) * ncols) + ncols,
+               self.data[(diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols].to_vec()).collect();               
+               self.data.splice((diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,top_row.clone());      
+               
                // Swap same rows in identity matrix p
-               mat_p.swap_rows(diag_idx, max_row_idx);
+               let row1:Vec<T> = mat_p.data.splice( (diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,
+               mat_p.data[((max_row_idx-1) * ncols)..((max_row_idx-1) * ncols) + ncols].to_vec()).collect();               
+               mat_p.data.splice(((max_row_idx-1)*ncols)..((max_row_idx-1)*ncols) + ncols, row1);      
+
                rows_swaps += 1;
-            }
 
-            // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
-            // row_k = row_k - row_1 * a_k1/a_11            
-            let row_diag_idx: Vec<T> =  mat_a.row(diag_idx as u128).iter().cloned().collect();
-            
-            
-            for beneath_diag_idx in diag_idx..ncols {
-               let elimination_fraction = mat_a[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/mat_a[((diag_idx) as u128,(diag_idx) as u128)];
-               println!("ef {}/{}", mat_a[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],mat_a[((diag_idx) as u128,(diag_idx) as u128)]);
-               let mut replacement_row_iter = row_diag_idx.iter()
-                                                                  .enumerate()                                                                  
-                                                                  .zip(mat_a.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
+               // Swap same rows in L matrix
+               let row1:Vec<T> = mat_l.data.splice( (diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,
+               mat_l.data[((max_row_idx-1) * ncols)..((max_row_idx-1) * ncols) + ncols].to_vec()).collect();               
+               mat_l.data.splice(((max_row_idx-1)*ncols)..((max_row_idx-1)*ncols) + ncols, row1);      
 
 
-               while let Some(elem) = replacement_row_iter.next()  {
-                  println!("idx {} ef {} old {} new {}", elem.0.0,elimination_fraction, *elem.1, *elem.1 - (elimination_fraction * *elem.0.1) );
-                  *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+               // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
+               // row_k = row_k - row_1 * a_k1/a_11            
+               for beneath_diag_idx in diag_idx..ncols {
+                  mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
+                  let elimination_fraction = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
+                  // println!("ef {}/{}", self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],max_diag_elem);
+                  let mut replacement_row_iter = top_row.iter()
+                                                                     .enumerate()                                                                  
+                                                                     .zip(self.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
+
+
+                  while let Some(elem) = replacement_row_iter.next()  {
+                     *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+                  }
+               }
+            } else {
+               // Proceed without row swap
+               let top_row:Vec<T> =  self.row(diag_idx as u128).iter().cloned().collect();
+               // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
+               // row_k = row_k - row_1 * a_k1/a_11            
+               for beneath_diag_idx in diag_idx..ncols {
+                  let elimination_fraction = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
+                  // println!("ef {}/{}", self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],max_diag_elem);
+                  let mut replacement_row_iter = top_row.iter()
+                                                                     .enumerate()                                                                  
+                                                                     .zip(self.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
+
+
+                  while let Some(elem) = replacement_row_iter.next()  {
+                     //println!("idx {} ef {} old {} new {}", elem.0.0,elimination_fraction, *elem.1, *elem.1 - (elimination_fraction * *elem.0.1) );
+                     *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+                  }
                }
             }
+         } else {
+            return Err("Matrix is degenerate.".to_string());
          }
       }
-      (mat_a.clone(),mat_p)
+      let newm = mat_l.data.iter_mut().step_by(ncols+1).map(|x| *x = T::one());
+      Ok((self,mat_l,mat_p,rows_swaps))
    }
 
    pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
