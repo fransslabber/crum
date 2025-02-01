@@ -689,7 +689,29 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
 
-   pub fn determinant_lu(&self, p: &Self, swaps: u32) -> T
+   /// Determinant of a real square matrix using its U from 
+   /// A = LU decomposition(Gauss Elimination with Partial Pivot - GEPP)
+   /// 
+   /// # Arguments
+   ///
+   /// * `self` - Upper Triangular component of a LU decomposition using GEPP.
+   /// * `swaps` - Number of row swaps during GEPP.
+   ///
+   /// # Returns
+   ///
+   /// The determinant of the original matrix A.
+   ///
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::matrix;
+   /// let mut m_a = matrix![[0.0,5.0,22.0/3.0],
+   ///                       [4.0,2.0,1.0],
+   ///                       [2.0,7.0,9.0]];
+   /// let (l,u,p, swaps) = m_a.lu(1e-15).unwrap();
+   /// assert_eq!(num_traits::Float::round(u.determinant_lu(swaps)), 6.0);
+   /// ```
+   pub fn determinant_lu(&self, swaps: u32) -> T
    where 
       T: Float
       {
@@ -700,17 +722,40 @@ impl<T: Clone + Copy> Matrix<T>
          if swaps % 2 == 0 {det} else {-det} 
       }
    
-   /// LU Decompose a matrix
-   /// Output is L-E and U as A=(L-E)+U such that P*A=L*U.
-   pub fn lu(mut self, precision: f64) -> Result<(Self,Self,Self,u32),String> 
+   /// LU Decompose a real matrix using Gauss Elimination with Partial Pivot.
+   /// Output is L,U,P such that P*A=L*U.
+   /// 
+   /// # Arguments
+   ///
+   /// * `self` - Real square matrix.
+   /// * `precision` - Tolerance to determine if matrix is degenerate.
+   ///
+   /// # Returns
+   ///
+   /// Matrices L(Lower Triangular),U(Upper Triangular),P(Permutation) and the number of rows swaps in the pivot process.
+   ///
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::matrix;
+   /// let mut m_a = matrix![[0.0,5.0,22.0/3.0],
+   ///                       [4.0,2.0,1.0],
+   ///                       [2.0,7.0,9.0]];
+   /// let (l,u,p, swaps) = m_a.lu(1e-15).unwrap();
+   /// let lhs = p.clone() * m_a.clone();
+   /// let rhs = l* u;
+   /// assert!(lhs.data().iter().zip(rhs.data().iter()).all(|(x,y)| x == y ));
+   /// ```
+   pub fn lu(&self, precision: f64) -> Result<(Self,Self,Self,u32),String> 
    where
       T: Float + Display + Debug,
    {
+      let mut mat_a = self.clone();
       let mut mat_p = Matrix::<T>::identity(self.rows as usize); // permutation matrix
       let mut rows_swaps = 0_u32;
       let ncols = self.cols as usize;
       let nrows = self.rows as usize;
-      let mut mat_l = Matrix::<T>::new(self.rows,self.cols,vec![T::zero();ncols*nrows]); // lower triangular matrix
+      let mut mat_l = Matrix::<T>::new(nrows as u128,ncols as u128,vec![T::zero();ncols*nrows]); // lower triangular matrix
 
       assert_eq!(ncols,nrows,"Matrix must be square.");
 
@@ -718,24 +763,22 @@ impl<T: Clone + Copy> Matrix<T>
       for diag_idx in 1..ncols {
 
          // check for max value in relevant column
-         //println!("diag_idx {} skip {} step {}",diag_idx,diag_idx-1 + (diag_idx-1)*ncols,ncols);
-         let (max_row_idx_vec, max_diag_elem) = self.data.iter()
+         let (max_row_idx_vec, max_diag_elem) = mat_a.data.iter()
                                                                      .enumerate()
                                                                      .skip(diag_idx-1 + (diag_idx-1)*ncols)
-                                                                     .step_by(ncols).
-                                                                     reduce(|acc,x| if acc.1.abs() < x.1.abs() {x} else {acc})
+                                                                     .step_by(ncols)
+                                                                     .reduce(|acc,x| if acc.1.abs() < x.1.abs() {x} else {acc})
                                                                      .unwrap();
          let max_row_idx = (max_row_idx_vec/nrows) + 1;
          let max_element = *max_diag_elem;
-         //println!("max row offset {} max row index {} element {}",max_row_idx_vec, max_row_idx,max_diag_elem);
          
          
          if max_element.to_f64().unwrap() > precision {
             if diag_idx != max_row_idx {
                // Swap k row with max row so that a_diag_idxdiag_idx is max and non zero
-               let top_row:Vec<T> = self.data.splice(((max_row_idx-1) * ncols)..((max_row_idx-1) * ncols) + ncols,
-               self.data[(diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols].to_vec()).collect();               
-               self.data.splice((diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,top_row.clone());      
+               let top_row:Vec<T> = mat_a.data.splice(((max_row_idx-1) * ncols)..((max_row_idx-1) * ncols) + ncols,
+               mat_a.data[(diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols].to_vec()).collect();               
+               mat_a.data.splice((diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,top_row.clone());      
                
                // Swap same rows in identity matrix p
                let row1:Vec<T> = mat_p.data.splice( (diag_idx-1)*ncols..((diag_idx-1)*ncols) + ncols,
@@ -753,34 +796,30 @@ impl<T: Clone + Copy> Matrix<T>
                // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
                // row_k = row_k - row_1 * a_k1/a_11            
                for beneath_diag_idx in diag_idx..ncols {
-                  mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
-                  let elimination_fraction = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
-                  // println!("ef {}/{}", self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],max_diag_elem);
+                  mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] = mat_a[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
                   let mut replacement_row_iter = top_row.iter()
                                                                      .enumerate()                                                                  
-                                                                     .zip(self.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
+                                                                     .zip(mat_a.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
 
 
                   while let Some(elem) = replacement_row_iter.next()  {
-                     *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+                     *elem.1 = *elem.1 - (mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] * *elem.0.1);
                   }
                }
             } else {
                // Proceed without row swap
-               let top_row:Vec<T> =  self.row(diag_idx as u128).iter().cloned().collect();
+               let top_row:Vec<T> =  mat_a.row(diag_idx as u128).iter().cloned().collect();
                // adjust ALL rows in BENEATH a_diag_idxdiag_idx as follows:
                // row_k = row_k - row_1 * a_k1/a_11            
                for beneath_diag_idx in diag_idx..ncols {
-                  let elimination_fraction = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
-                  // println!("ef {}/{}", self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)],max_diag_elem);
+                  mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] = self[((beneath_diag_idx+1) as u128,(diag_idx) as u128)]/max_element;
                   let mut replacement_row_iter = top_row.iter()
                                                                      .enumerate()                                                                  
-                                                                     .zip(self.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
+                                                                     .zip(mat_a.data.iter_mut().skip(((beneath_diag_idx-1)*ncols)+ ncols));
 
 
                   while let Some(elem) = replacement_row_iter.next()  {
-                     //println!("idx {} ef {} old {} new {}", elem.0.0,elimination_fraction, *elem.1, *elem.1 - (elimination_fraction * *elem.0.1) );
-                     *elem.1 = *elem.1 - (elimination_fraction * *elem.0.1);
+                     *elem.1 = *elem.1 - (mat_l[((beneath_diag_idx+1) as u128,(diag_idx) as u128)] * *elem.0.1);
                   }
                }
             }
@@ -788,65 +827,68 @@ impl<T: Clone + Copy> Matrix<T>
             return Err("Matrix is degenerate.".to_string());
          }
       }
-      let newm = mat_l.data.iter_mut().step_by(ncols+1).map(|x| *x = T::one());
-      Ok((self,mat_l,mat_p,rows_swaps))
+
+      // update diagonal of mat_l with ones
+      let _ = mat_l.data.iter_mut().step_by(ncols+1).for_each(|x| *x = T::one());
+ 
+      Ok((mat_l,mat_a,mat_p,rows_swaps))
    }
 
-   pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
-   where 
-      T: Float + From<f64>,
-      f64: From<T> + Mul<T>
-   {
-      assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
-      let eigen_values_real = Vec::<T>::new();
-      let eigen_values_complex = Vec::<Complex<T>>::new();
+   // pub fn eigen_schur(&self) -> (Vec<T>,Vec<Complex<T>>)
+   // where 
+   //    T: Float + From<f64>,
+   //    f64: From<T> + Mul<T>
+   // {
+   //    assert_eq!(self.rows,self.cols,"Matrix must be a square matrix");
+   //    let eigen_values_real = Vec::<T>::new();
+   //    let eigen_values_complex = Vec::<Complex<T>>::new();
 
 
-      // // set real-complex split threshold
-      // let threshold = Complex::new(<T as From<f64>>::from(0.001),<T as From<f64>>::from(0.001)).magnitude();
+   //    // // set real-complex split threshold
+   //    // let threshold = Complex::new(<T as From<f64>>::from(0.001),<T as From<f64>>::from(0.001)).magnitude();
 
-      // // Process diagonal : if block then complex conjugate eigen pair, if not then real eigen value
-      // // For each elem(ij), if elem(i+1,j) == zero, then elem(ij) is a real eigen value, and skip 1 diag elem, else;
-      // // the 2x2 sub-matrix i..i+1 x j..j+1 has complex conjugate eigenvalue pairs.
+   //    // // Process diagonal : if block then complex conjugate eigen pair, if not then real eigen value
+   //    // // For each elem(ij), if elem(i+1,j) == zero, then elem(ij) is a real eigen value, and skip 1 diag elem, else;
+   //    // // the 2x2 sub-matrix i..i+1 x j..j+1 has complex conjugate eigenvalue pairs.
 
-      // let mut row_idx = 1_u128;
-      // let mut col_idx = 1_u128;
+   //    // let mut row_idx = 1_u128;
+   //    // let mut col_idx = 1_u128;
 
-      // while row_idx <= self.rows {
-      //    while col_idx <= self.cols {
+   //    // while row_idx <= self.rows {
+   //    //    while col_idx <= self.cols {
 
-      //       if row_idx == self.rows && col_idx == self.cols {
-      //          //println!("eigen real: {}",schur[(row_idx,col_idx)]);
-      //          eigen_values_real.push(self[(row_idx,col_idx)].real());
-      //          row_idx += 1;
-      //          col_idx += 1;
-      //       } else{
-      //          if self[(row_idx+1,col_idx)].magnitude() <= threshold {
-      //             //println!("eigen real: {}",schur[(row_idx,col_idx)]);
-      //             eigen_values_real.push(self[(row_idx,col_idx)].real());
-      //             row_idx += 1;
-      //             col_idx += 1;
+   //    //       if row_idx == self.rows && col_idx == self.cols {
+   //    //          //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+   //    //          eigen_values_real.push(self[(row_idx,col_idx)].real());
+   //    //          row_idx += 1;
+   //    //          col_idx += 1;
+   //    //       } else{
+   //    //          if self[(row_idx+1,col_idx)].magnitude() <= threshold {
+   //    //             //println!("eigen real: {}",schur[(row_idx,col_idx)]);
+   //    //             eigen_values_real.push(self[(row_idx,col_idx)].real());
+   //    //             row_idx += 1;
+   //    //             col_idx += 1;
 
-      //          } else {
-      //             let schur_sub = self.sub_matrix(row_idx as u128..= (row_idx+1)  as u128, col_idx as u128..=(col_idx+1) as u128);
-      //             let (lambda1,lambda2) = Matrix::eigen_2x2(schur_sub);
-      //             // Check if we have a complex conjugate pair
-      //             if lambda1.conj() == lambda2 {
-      //                //println!("eigen complex: {} {}",lambda1,lambda2 );
-      //                eigen_values_complex.push(lambda1);
-      //                eigen_values_complex.push(lambda2);
-      //                row_idx += 2; col_idx += 2;
-      //             } else {
-      //                eigen_values_real.push(self[(row_idx,col_idx)].real());
-      //                row_idx += 1;
-      //                col_idx += 1;                     
-      //             }
-      //          }
-      //       }
-      //    }
-      // }
-      (eigen_values_real,eigen_values_complex)
-   }
+   //    //          } else {
+   //    //             let schur_sub = self.sub_matrix(row_idx as u128..= (row_idx+1)  as u128, col_idx as u128..=(col_idx+1) as u128);
+   //    //             let (lambda1,lambda2) = Matrix::eigen_2x2(schur_sub);
+   //    //             // Check if we have a complex conjugate pair
+   //    //             if lambda1.conj() == lambda2 {
+   //    //                //println!("eigen complex: {} {}",lambda1,lambda2 );
+   //    //                eigen_values_complex.push(lambda1);
+   //    //                eigen_values_complex.push(lambda2);
+   //    //                row_idx += 2; col_idx += 2;
+   //    //             } else {
+   //    //                eigen_values_real.push(self[(row_idx,col_idx)].real());
+   //    //                row_idx += 1;
+   //    //                col_idx += 1;                     
+   //    //             }
+   //    //          }
+   //    //       }
+   //    //    }
+   //    // }
+   //    (eigen_values_real,eigen_values_complex)
+   // }
 
    #[allow(dead_code)]
    fn mul(self, other: T) -> Self
