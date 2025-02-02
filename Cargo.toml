@@ -10,7 +10,7 @@ keywords = ["complexnumbers", "complexmatrix","numericalanalysis","mathematics"]
 categories = ["mathematics", "science"]
 documentation = "http://www.gaiamathematica.net/crum"
 homepage = "http://www.gaiamathematica.net"
-authors = "frans@gaiamathematica.net"
+authors = ["Frans Slabber <frans@gaiamathematica.net>"]
 
 [dependencies]
 num-traits = "0.2.19"

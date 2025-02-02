@@ -9,7 +9,7 @@ use num_traits::float::FloatCore;
 use num_traits::{Float, One, Zero,Signed};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
-use std::iter::Skip;
+use std::iter::{Enumerate, Skip};
 
 ///
 /// Some linear algebra operations on vector quantities
@@ -689,6 +689,41 @@ impl<T: Clone + Copy> Matrix<T>
    }
 
 
+   /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
+ * OUTPUT: x - solution vector of A*x=b
+ */
+// void LUPSolve(double **A, int *P, double *b, int N, double *x) {
+
+//    for (int i = 0; i < N; i++) {
+//        x[i] = b[P[i]];
+
+//        for (int k = 0; k < i; k++)
+//            x[i] -= A[i][k] * x[k];
+//    }
+
+//    for (int i = N - 1; i >= 0; i--) {
+//        for (int k = i + 1; k < N; k++)
+//            x[i] -= A[i][k] * x[k];
+
+//        x[i] /= A[i][i];
+//    }
+// }
+   pub fn linear_solve_lu(l: &Matrix<T>, u: Matrix<T>, p: Matrix<T>, b: &Vec<T>) -> Vec<T>
+   where 
+      T: Float
+   {
+      // Lx = Py
+      let mut x:Vec<T> = p.data.chunks(p.cols as usize)
+                     .map(|x | b[x.iter().position(|i| i.is_one()).unwrap()])
+                     .collect();
+      
+      x.iter_mut().enumerate().map(|a| *a = *a -    );
+
+
+
+      x
+   }
+
    /// Determinant of a real square matrix using its U from 
    /// A = LU decomposition(Gauss Elimination with Partial Pivot - GEPP)
    /// 
@@ -715,10 +750,7 @@ impl<T: Clone + Copy> Matrix<T>
    where 
       T: Float
       {
-         let mut det = T::one();
-         for elem in self.diag().iter(){
-            det=det**elem;
-         }
+         let det = self.diag().iter().fold(T::one(),|acc,x| acc * *x );
          if swaps % 2 == 0 {det} else {-det} 
       }
    
