@@ -288,7 +288,7 @@ impl<T: Clone + Copy> Matrix<T>
       data
    }
 
-   fn round_to_decimal_places(value: T, decimal_places: u32) -> T
+   pub fn round_to_decimal_places(value: T, decimal_places: u32) -> T
    where 
       T: Float {
       let factor = T::from(10).unwrap().powi(decimal_places as i32);
@@ -687,41 +687,57 @@ impl<T: Clone + Copy> Matrix<T>
       self.data.splice(((row2_idx-1)*self.cols as usize)..((row2_idx-1)*self.cols as usize) + self.cols as usize,
       row1);      
    }
-
-
-   /* INPUT: A,P filled in LUPDecompose; b - rhs vector; N - dimension
- * OUTPUT: x - solution vector of A*x=b
- */
-// void LUPSolve(double **A, int *P, double *b, int N, double *x) {
-
-//    for (int i = 0; i < N; i++) {
-//        x[i] = b[P[i]];
-
-//        for (int k = 0; k < i; k++)
-//            x[i] -= A[i][k] * x[k];
-//    }
-
-//    for (int i = N - 1; i >= 0; i--) {
-//        for (int k = i + 1; k < N; k++)
-//            x[i] -= A[i][k] * x[k];
-
-//        x[i] /= A[i][i];
-//    }
-// }
-   pub fn linear_solve_lu(l: &Matrix<T>, u: Matrix<T>, p: Matrix<T>, b: &Vec<T>) -> Vec<T>
-   where 
+   /// Solve linear system of equations given a real square matrix, and a solution vector, using
+   /// A = LU decomposition(Gauss Elimination with Partial Pivot - GEPP)
+   /// 
+   /// # Arguments
+   ///
+   /// * `self` - A real square matrix.
+   /// * 'y' - A solution vector of same dimensions as the given matrix.
+   /// * `precision` - Tolerance to determine if matrix is degenerate.
+   ///
+   /// # Returns
+   ///
+   /// Result with solution vector on success or an error msg.
+   ///
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::matrix;
+   ///    let m_a = matrix![[0.0,5.0,22.0/3.0],
+   ///    [4.0,2.0,1.0],
+   ///    [2.0,7.0,9.0]];
+   /// let b = vec![3.0,5.0,7.0];
+   /// let x = m_a.linear_solve_lu(&b,1e-15).unwrap();
+   /// assert!( Matrix::<f64>::round_to_decimal_places(x[0],4) == -0.5000 && Matrix::<f64>::round_to_decimal_places(x[1],4) == 5.0000 && Matrix::<f64>::round_to_decimal_places(x[2],4) == -3.0000 );
+   /// ```
+   pub fn linear_solve_lu(&self,y: &Vec<T>, precision: f64) -> Result<Vec<T>,String>
+   where
       T: Float
    {
+      let (l,u,p,_) = self.lu(precision)?;
+
       // Lx = Py
       let mut x:Vec<T> = p.data.chunks(p.cols as usize)
-                     .map(|x | b[x.iter().position(|i| i.is_one()).unwrap()])
+                     .map(|x | y[x.iter().position(|i| i.is_one()).unwrap()])
                      .collect();
       
-      x.iter_mut().enumerate().map(|a| *a = *a -    );
+      for row_idx in 1..l.rows as usize {
+         let row = &l.data[row_idx*l.cols as usize..row_idx*l.cols as usize + l.cols as usize];
+         for col_idx in 0..row_idx {
+            x[row_idx] = x[row_idx] - row[col_idx] * x[row_idx-1];
+         }
+      }
 
+      // Ux = y
+      for (row_idx,row) in u.data.chunks(u.cols as usize).enumerate().rev() {         
+         for col_idx in (row_idx+1)..u.cols as usize {
+            x[row_idx] = x[row_idx] - (row[col_idx] * x[col_idx]);
+         }
 
-
-      x
+         x[row_idx] = x[row_idx]/row[row_idx]
+      }
+      Ok(x)
    }
 
    /// Determinant of a real square matrix using its U from 
@@ -780,7 +796,7 @@ impl<T: Clone + Copy> Matrix<T>
    /// ```
    pub fn lu(&self, precision: f64) -> Result<(Self,Self,Self,u32),String> 
    where
-      T: Float + Display + Debug,
+      T: Float
    {
       let mut mat_a = self.clone();
       let mut mat_p = Matrix::<T>::identity(self.rows as usize); // permutation matrix

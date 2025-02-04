@@ -16,4 +16,8 @@ NB: This is an experimental in beta package, use at your own discretion. Some fu
 ## Matrices
 - generic to all types implementing num_traits Float and Num
 - extra vector functions
-- complex number specific functionality such Complex Householder Transform, Complex QR decomposition, Schur Decomposition, Eigenstates...
+- complex number specific functionality such Complex Householder Transform, Complex QR decomposition,
+  Schur Decomposition
+- LU Decomposition(Gauss Elimination with Partial Pivot) for real matrices.
+- Real Square matrix determinant
+- Solve linear system of equations with LU decomposition.
