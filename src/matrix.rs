@@ -709,7 +709,9 @@ impl<T: Clone + Copy> Matrix<T>
    ///    [2.0,7.0,9.0]];
    /// let b = vec![3.0,5.0,7.0];
    /// let x = m_a.linear_solve_lu(&b,1e-15).unwrap();
-   /// assert!( Matrix::<f64>::round_to_decimal_places(x[0],4) == -0.5000 && Matrix::<f64>::round_to_decimal_places(x[1],4) == 5.0000 && Matrix::<f64>::round_to_decimal_places(x[2],4) == -3.0000 );
+   /// assert!( Matrix::<f64>::round_to_decimal_places(x[0],4) == -0.5000 
+   ///         && Matrix::<f64>::round_to_decimal_places(x[1],4) == 5.0000 
+   ///         && Matrix::<f64>::round_to_decimal_places(x[2],4) == -3.0000 );
    /// ```
    pub fn linear_solve_lu(&self,y: &Vec<T>, precision: f64) -> Result<Vec<T>,String>
    where
