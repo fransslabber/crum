@@ -1,12 +1,14 @@
 use crate::complex::Complex;
 use crate::matrix;
 
+use std::convert::identity;
 use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub,};
+use std::result;
 use std::slice::IterMut;
 use std::vec::Vec;
 use std::fmt::{Debug, Display};
 use num_traits::float::FloatCore;
-use num_traits::{Float, One, Zero,Signed};
+use num_traits::{Float, NumCast, One, Signed, Zero};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
 use std::iter::{Enumerate, Skip};
@@ -687,6 +689,64 @@ impl<T: Clone + Copy> Matrix<T>
       self.data.splice(((row2_idx-1)*self.cols as usize)..((row2_idx-1)*self.cols as usize) + self.cols as usize,
       row1);      
    }
+
+   /// Inverse of a square real matrix using
+   /// A = LU decomposition(Gauss Elimination with Partial Pivot - GEPP)
+   /// 
+   /// # Arguments
+   ///
+   /// * `self` - A real square matrix.
+   /// * `precision` - Tolerance to determine if matrix is degenerate.
+   ///
+   /// # Returns
+   ///
+   /// Result with inverse matrix on success or an error msg.
+   ///
+   /// #Example   
+   /// ```
+   /// use crum::matrix::Matrix;
+   /// use crum::matrix;
+   ///    let m_a = matrix![[0.0,5.0,22.0/3.0],
+   ///    [4.0,2.0,1.0],
+   ///    [2.0,7.0,9.0]];
+   /// let x = m_a.inverse_lu(1e-15).unwrap();
+   /// let i_computed = x * m_a;
+   /// assert!( i_computed.diag().iter().all(|x| Matrix::<f64>::round_to_decimal_places(*x,4) == 1.0000) )
+   /// ```
+   pub fn inverse_lu(&self, precision: f64) -> Result<Matrix<T>,String>
+   where
+      T: Float
+   {
+      let (l,u,p,_) = self.lu(precision)?;
+      // AX = LUX = I, solve for each column of X as a system of linear eqns.
+      let mut m_x =  Matrix::<T>::new(self.rows,self.cols,vec![T::zero();(self.rows * self.cols) as usize]);
+      // Lx = Py
+      // PY = PI = P Y is identity matrix
+      for idx in 1..=self.cols {
+ 
+         let mut x = p.col(idx);
+         // Lx = Py
+         for row_idx in 1..l.rows as usize {
+            let row = &l.data[row_idx*l.cols as usize..row_idx*l.cols as usize + l.cols as usize];
+            for col_idx in 0..row_idx {
+               x[row_idx] = x[row_idx] - row[col_idx] * x[row_idx-1];
+            }
+         }
+
+         // Ux = y
+         for (row_idx,row) in u.data.chunks(u.cols as usize).enumerate().rev() {         
+            for col_idx in (row_idx+1)..u.cols as usize {
+               x[row_idx] = x[row_idx] - (row[col_idx] * x[col_idx]);
+            }
+
+            x[row_idx] = x[row_idx]/row[row_idx]
+         }
+
+         m_x.col_set(idx,x);
+      }
+      Ok(m_x)
+   }
+
    /// Solve linear system of equations given a real square matrix, and a solution vector, using
    /// A = LU decomposition(Gauss Elimination with Partial Pivot - GEPP)
    /// 
@@ -1254,7 +1314,7 @@ impl<T> Matrix<Complex<T>>
    /// assert!(schur_result.0.diag()[0] == Complex::new(4.863674157977457,4.730078401818301) );
    /// ```
    #[allow(dead_code)]
-   pub fn schur(&self, precision: f64) -> Result<(Self,Self),String>
+   pub fn schur(&self, precision: f64) -> Result<(Self,Self,Self),String>
    where 
       T:Clone + Zero + Float + From<f64> + Debug + Signed,
       f64: From<T> + Mul<T>
@@ -1264,7 +1324,7 @@ impl<T> Matrix<Complex<T>>
       let mut mat_a: Matrix<Complex<T>> = self.clone();
       let mut sub_diag = vec![Complex::<T>::zero(); (self.clone().rows() - 1) as usize];
       let mut count_iter = 1;
-      //let mut epsilon = Complex::new(T::zero(),T::zero());
+      let mut mat_v = Matrix::<Complex<T>>::identity(self.rows as usize);
 
       while count_iter < 10000 {
 
@@ -1277,10 +1337,11 @@ impl<T> Matrix<Complex<T>>
          //let shift_wilkinson = Matrix::<Complex<T>>::identity(self.rows() as usize).mul(epsilon);
          let (mat_q,mat_r) = Matrix::<Complex<T>>::qr_cht(&mat_a);
          mat_a = mat_r.clone() * mat_q.clone();
+         mat_v = mat_v * mat_q.clone();
 
          // Compare sub-diagonal for convergence
          if mat_a.skew_diag(-1).iter().zip(sub_diag.clone()).all(|(a,b)| (a.magnitude() - b.magnitude()).abs().to_f64().unwrap() < precision ) == true {
-            return Ok((mat_a,mat_q));
+            return Ok((mat_a,mat_q,mat_v));
          };
          sub_diag = mat_a.skew_diag(-1);
          count_iter += 1;
@@ -1300,10 +1361,26 @@ impl<T> Matrix<Complex<T>>
       let discriminant = (trace * trace) - Complex::<T>::new(<T as From<f64>>::from(4.0), T::zero()) * self.det_2x2();
 
       // Eigenvalues using the quadratic formula
-      let lambda1 = (Complex::from(trace) + discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
-      let lambda2 = (Complex::from(trace) - discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
+      let lambda1 = (trace + discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
+      let lambda2 = (trace - discriminant.sqrt()) / Complex::<T>::new(<T as From<f64>>::from(2.0), T::zero());
 
       (lambda1, lambda2)
+   }
+
+   pub fn svd_qr(&self,precision: f64) -> Result<(Self,Self,Self),String>
+   where 
+      T:Clone + Zero + Float + From<f64> + Debug + Signed + Display,
+      f64: From<T> + Mul<T>
+   {
+      let (b,d,v) = (self.clone() * self.clone().trans().conj()).schur(precision)?;
+      let singular_values:Vec<f64> = b.diag().iter().map(|x| (x.real().to_f64().unwrap()).abs().sqrt()).collect::<Vec<f64>>();
+      let mut sigma = Matrix::<Complex<T>>::identity(self.rows as usize);
+      let mut pinv_sigma = Matrix::<Complex<T>>::identity(self.rows as usize);
+      sigma.data.iter_mut().step_by((self.cols + 1) as usize).zip(singular_values.iter()).map(|(x,sv)| *x = Complex::new( <T as From<f64>>::from(*sv),T::zero())).for_each(|_| ()); 
+      pinv_sigma.data.iter_mut().step_by((self.cols + 1) as usize).zip(singular_values.iter()).map(|(x,sv)| *x = Complex::new( T::one()/<T as From<f64>>::from(*sv),T::zero())).for_each(|_| ()); 
+      let u = self.clone() * v.clone() * pinv_sigma;
+
+      Ok((u,sigma,v))
    }
 
 }

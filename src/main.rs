@@ -1,66 +1,38 @@
-use std::ops::Mul;
-
 use crum::matrix;
-// use crum::complex::Complex;
-use crum::matrix::Matrix;
+use crum::complex::Complex;
+
 
 fn main() {
 
+   let m_complex_f64 = matrix![[Complex::new(1.0,1.0),Complex::new(2.0,0.0)],
+                                                  [Complex::new(3.0,0.0),Complex::new(4.0,-1.0)]];
 
-   // let m_a = matrix![[0.0,5.0,22.0/3.0],
-   //                        [4.0,2.0,1.0],
-   //                        [2.0,7.0,9.0]];
-
-   //let (l,u,p, swaps) = m_a.lu(1e-15).unwrap();
- 
-   //println!("swaps {}\nu{}\np{}\nl{}\nPA {}\nLU {}",swaps, u.clone(),p, l.clone(),p.clone() * m_a.clone() ,l.clone()* u.clone());
-
-   // let b = vec![3.0,5.0,7.0];
-   // let x = m_a.linear_solve_lu(&b,1e-15).unwrap();
-   // assert!( Matrix::<f64>::round_to_decimal_places(x[0],4) == -0.5000 && Matrix::<f64>::round_to_decimal_places(x[1],4) == 5.0000 && Matrix::<f64>::round_to_decimal_places(x[2],4) == -3.0000 );
-
-
-   let m_b = matrix![[5.0,     2.0,     5.0,     9.0,     5.0,     8.0,     3.0,     6.0,    10.0,     7.0],
-                                       [1.0,    10.0,    10.0,     7.0,     1.0,     4.0,     4.0,     3.0,     8.0,     4.0],
-                                       [3.0,     1.0,     2.0,     4.0,    10.0,     3.0,     9.0,     8.0,     5.0,     9.0],
-                                    [10.0,     8.0,     3.0,     6.0,    10.0,     5.0,     1.0,     2.0,     5.0,     6.0],
-                                       [2.0,     9.0,     2.0,     5.0,     5.0,     1.0,     1.0,     7.0,     5.0,     4.0],
-                                       [9.0,     9.0,     2.0,     1.0,     5.0,     2.0,     2.0,     2.0,     4.0,    10.0],
-                                       [6.0,     1.0,     9.0,     3.0,     4.0,    10.0,     7.0,     4.0,     6.0,     9.0],
-                                    [10.0,     4.0,     6.0,     2.0,    10.0,    10.0,     8.0,     7.0,     6.0,     6.0],
-                                       [1.0,     3.0,     6.0,     2.0,     4.0,     6.0,     7.0,     8.0,     9.0,     7.0],
-                                    [ 5.0,     9.0,     2.0,     3.0,     2.0,     1.0,     5.0,     1.0,     8.0,     6.0]];
-   let x = vec![3.0,
-   4.0,
-   5.0,
-   3.0,
-   9.0,
-   2.0,
-   3.0,
-   2.0,
-   3.0,
-   5.0];
-   
-   let m_x = matrix![[3.0],
-   [4.0],
-   [5.0],
-   [3.0],
-   [9.0],
-   [2.0],
-   [3.0],
-   [2.0],
-   [3.0],
-   [5.0]];
-
-
-   let b = m_b.clone().mul(m_x);
-   let x_computed = m_b.linear_solve_lu(&b.data(),1e-15).unwrap();
-   println!("{:?} {:?}",x,x_computed);
+   let (u,sigma,v) = m_complex_f64.svd_qr(1e-15).unwrap();
+   println!("Left Singular Vectors {u}\nSigma {sigma}\nRight Singular Vectors {v}");
+   println!("Reconstructed A {}", u * sigma * v.trans().conj());
 
 }
+/*Matrix A:
+   1.0000 + 1.0000i   2.0000 + 0.0000i
+   3.0000 + 0.0000i   4.0000 - 1.0000i
 
-//
-// -0.5000
-// 5.0000
-// -3.0000
-//
+Computed Singular Values:
+    5.6289
+    0.5618
+
+Pinverse Sigma:
+    0.1777         0
+         0    1.7800
+
+Left Singular Vectors (U):
+   0.3754 + 0.2007i   0.2303 - 0.8751i
+   0.9030 + 0.0582i   0.0717 + 0.4196i
+
+Right Singular Vectors (V):
+   0.5836 - 0.0000i  -0.7647 + 0.2731i
+   0.7647 + 0.2731i   0.5836 + 0.0000i
+
+Reconstructed A (U * Sigma * V') for verification:
+   1.0000 + 1.0000i   2.0000 + 0.0000i
+   3.0000 + 0.0000i   4.0000 - 1.0000i
+ */
