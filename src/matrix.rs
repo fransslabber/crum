@@ -2,7 +2,7 @@ use crate::complex::Complex;
 use crate::matrix;
 
 use std::convert::identity;
-use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub,};
+use std::ops::{Add, Div, Index, IndexMut, Mul, RangeInclusive, Sub};
 use std::result;
 use std::slice::IterMut;
 use std::vec::Vec;
@@ -12,6 +12,7 @@ use num_traits::{Float, NumCast, One, Signed, Zero};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
 use std::iter::{Enumerate, Skip};
+use std::cmp::PartialEq;
 
 ///
 /// Some linear algebra operations on vector quantities
@@ -1310,7 +1311,6 @@ impl<T> Matrix<Complex<T>>
    ///       return; // Exit the function early if there's an error
    ///   }
    /// };
-   /// schur_result.0.diag().iter().for_each(|x| println!("{:?}",x));
    /// assert!(schur_result.0.diag()[0] == Complex::new(4.863674157977457,4.730078401818301) );
    /// ```
    #[allow(dead_code)]
@@ -1367,6 +1367,18 @@ impl<T> Matrix<Complex<T>>
       (lambda1, lambda2)
    }
 
+   /// Singular Value Decomposition uing QR iteration.
+   /// ```
+   /// use crum::matrix;
+   /// use crum::complex::Complex;
+   /// use crum::matrix::Matrix;
+   ///   let m_complex_f64 = matrix![[Complex::new(1.0,1.0),Complex::new(2.0,0.0)],
+   ///                              [Complex::new(3.0,0.0),Complex::new(4.0,-1.0)]];
+   ///   let (u,sigma,v) = m_complex_f64.svd_qr(1e-15).unwrap();
+   ///   let reconstructed = u * sigma * v.trans().conj();
+   ///   assert!(m_complex_f64.data().iter().zip(reconstructed.data().iter()).all(|(x,y)| *x == Matrix::<Complex<f64>>::round_to_decimal_places(*y,4)) );
+   ///   
+   /// ```
    pub fn svd_qr(&self,precision: f64) -> Result<(Self,Self,Self),String>
    where 
       T:Clone + Zero + Float + From<f64> + Debug + Signed + Display,

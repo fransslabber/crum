@@ -1,5 +1,6 @@
-use crum::matrix;
+use crum::matrix::Matrix;
 use crum::complex::Complex;
+use crum::matrix;
 
 
 fn main() {
@@ -8,8 +9,10 @@ fn main() {
                                                   [Complex::new(3.0,0.0),Complex::new(4.0,-1.0)]];
 
    let (u,sigma,v) = m_complex_f64.svd_qr(1e-15).unwrap();
-   println!("Left Singular Vectors {u}\nSigma {sigma}\nRight Singular Vectors {v}");
-   println!("Reconstructed A {}", u * sigma * v.trans().conj());
+   let reconstructed = u * sigma * v.trans().conj();
+   assert!(m_complex_f64.data().iter().zip(reconstructed.data().iter()).all(|(x,y)| *x == Matrix::<Complex<f64>>::round_to_decimal_places(*y,4)) );
+   //println!("Left Singular Vectors {u}\nSigma {sigma}\nRight Singular Vectors {v}");
+   println!( "Reconstructed A {}", reconstructed);
 
 }
 /*Matrix A:
