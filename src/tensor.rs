@@ -15,41 +15,11 @@ pub struct TSeq {
 //    x * x
 // // }
 
-
-//    constexpr FASTOR_INLINE seq(int _f, int _l, int _s=1) : _first(_f), _last(_l), _step(_s) {}
-//    constexpr FASTOR_INLINE seq(int num) : _first(num), _last(num+1), _step(1) {}
-
-//    template<int F, int L, int S=1>
-//    constexpr FASTOR_INLINE seq(fseq<F,L,S>) : _first(F), _last(L), _step(S) {}
-
-//    // Do not allow construction of seq using std::initializer_list, as it happens
-//    // implicitly. Overloading operator() with std::initializer_list should imply
-//    // TensorRandomView, not TensorView
-//    template<typename T>
-//    constexpr FASTOR_INLINE seq(std::initializer_list<T> _s1) = delete;
-
-//    // Do not provide this overload as it is meaningless [iseq stands for immediate evaluation]
-//    // template<size_t F, size_t L, size_t S=1>
-//    // constexpr FASTOR_INLINE seq(iseq<F,L,S>) : _first(F), _last(L), _step(S) {}
-
-//    FASTOR_INLINE int size() const {
-//        int range = _last - _first;
-//        return range % _step==0 ? range/_step : range/_step+1;
-//    }
-
-//    constexpr FASTOR_INLINE bool operator==(seq other) const {
-//        return (_first==other._first && _last==other._last && _step==other._step) ? true : false;
-//    }
-//    constexpr FASTOR_INLINE bool operator!=(seq other) const {
-//        return (_first!=other._first || _last!=other._last || _step!=other._step) ? true : false;
-//    }
-
-
 // structure with data stored as row dominant
 #[derive(Clone,Debug)]
 pub struct Tensor<T> 
 {
-   dim: Vec<usize>,
+   shape: Vec<usize>,
    strides: Vec<usize>,
    data: Vec<T>
 }
@@ -95,7 +65,7 @@ impl<T: Clone + Copy> Tensor<T>
          "The number of elements in the data Vec exceeds possible max size usize::MAX"
       );
 
-      Tensor { dim: dimensions,strides: strides, data: data.to_vec() }
+      Tensor { shape: dimensions,strides: strides, data: data.to_vec() }
    }
 
    pub fn zeros(dimensions: TCoord) -> Self
@@ -156,4 +126,15 @@ impl<T: Clone + Copy> Tensor<T>
       Self::new(dimensions,&random_numbers)
    }
 
+}
+
+#[macro_export]
+macro_rules! tensor {
+   // Match rows and columns   
+   ( $x:expr ) => {
+      {
+         let (t,d):(Vec<_>,Vec<usize>) = tensor_macro::tensor_flatten!($x);
+         crum::tensor::Tensor::new(d,&t)
+      }  
+   };   
 }

@@ -4,31 +4,46 @@ use quote::quote;
 use syn::{parse_macro_input, Expr, ExprArray};
 
 #[proc_macro]
-pub fn tensor(input: TokenStream) -> TokenStream {
-    // Parse the input tokens into a syntax tree
+pub fn tensor_flatten(input: TokenStream) -> TokenStream {
+   // Parse the input tokens into a syntax tree
    let input = parse_macro_input!(input as ExprArray);
 
-   // Flatten the nested arrays into a Vec
-   let flattened = flatten_array(&input);
+   let mut sizes = Vec::new();
+   let mut level:usize = 1;
+   // Flatten the nested arrays and collect sizes
+   let flattened = flatten_array(&input,&mut sizes,&mut level);
 
    // Generate the output code
    let output = quote! {
-      vec![#(#flattened),*]
+      {
+         let flattened = vec![#(#flattened),*];
+         let sizes = vec![#(#sizes),*];
+         (flattened, sizes)
+      }
    };
 
    // Convert the output back into a TokenStream
    TokenStream::from(output)
 }
 
-// Recursively flatten nested arrays
-fn flatten_array(array: &ExprArray) -> Vec<Expr> {
-   let mut result = Vec::new();
+// Recursively flatten nested arrays and collect sizes
+fn flatten_array(array: &ExprArray, sizes: &mut Vec<usize>,level: &mut usize) -> Vec<Expr> {
+   let mut flattened = Vec::new();   
+
+   // Record the size of the current level
+   if sizes.len() < *level {
+      sizes.push(array.elems.len());
+   }
+   *level = *level + 1;
+   // Recursively process each element
    for element in &array.elems {
       if let Expr::Array(nested_array) = element {
-         result.extend(flatten_array(nested_array));
+         let nested_flattened = flatten_array(nested_array,sizes,level);
+         flattened.extend(nested_flattened);
       } else {
-         result.push(element.clone());
+         flattened.push(element.clone());
       }
    }
-   result
+   *level = *level - 1;
+   flattened
 }
