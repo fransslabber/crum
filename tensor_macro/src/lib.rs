@@ -3,6 +3,8 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Expr, ExprArray};
 
+///// TODO add assertion to check dimention consistency...
+
 #[proc_macro]
 pub fn tensor_flatten(input: TokenStream) -> TokenStream {
    // Parse the input tokens into a syntax tree
