@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::fmt::Display;
 use std::ops::{Add, Div, Index, IndexMut, Mul, Range, RangeInclusive, Sub};
 use num_traits::{Float, NumCast, One, Signed, ToPrimitive, Zero};
@@ -31,6 +32,36 @@ impl<T> IndexMut<&Vec<usize>> for Tensor<T>
    }
 }
 
+/// Implement display of a generic matrix; {}
+impl<T: Clone + Display> Display for Tensor<T>
+{
+   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+
+      fn nested_fmt<T: Clone + Display>(f: &mut std::fmt::Formatter<'_>, t: &Tensor<T>, depth: usize, acc_offset: usize) {         
+         let rnge = 0..t.shape[depth];
+         let spacing = 3*(depth);
+         
+         if depth < t.shape.len()-1 {
+            write!(f, "\n{:>spacing$}","[").expect("Not Written");
+            let rnge_iter = rnge.clone().into_iter().enumerate(); //.for_each(|(idx,rnge_idx)|nested_fmt(f, t, depth + 1 , acc_offset + rnge_idx.clone() * t.strides[depth]) );
+            for (idx,rnge_idx) in rnge_iter {
+               nested_fmt(f, t, depth + 1 , acc_offset + rnge_idx.clone() * t.strides[depth]);
+               if idx < t.shape[depth]-1 {write!(f, ",").expect("Not Written")} 
+                           else {write!(f, "\n{:>spacing$}","]").expect("Not Written")};
+            }
+         } else {
+            write!(f, "\n{:>spacing$}","[").expect("Not Written");
+            rnge.clone().into_iter()
+               .enumerate()
+               .for_each(|(idx,dim)| if idx < t.shape[depth] -1 {write!(f, "{:8.4}," , t.data[dim + acc_offset]).expect("Not Written") }
+                                                                                    else {write!(f, "{:8.4}" , t.data[dim + acc_offset]).expect("Not Written") } );
+            write!(f, "{}"," ]").expect("Not Written");
+         }
+      }
+      nested_fmt(f, self, 0, 0);
+      Ok(())
+   }
+}
 
 /// Implement standard functions for generic tensors
 impl<T: Clone + Copy> Tensor<T>
@@ -91,14 +122,8 @@ impl<T: Clone + Copy> Tensor<T>
             }
       }
 
-      let depth = 0;
-      let acc_offset:usize = 0;
-
-      // Setup new shape
-      let shape = coords.iter().filter(|rnge| rnge.size_hint() != (1,Some(1)) ).map(|rnge| rnge.size_hint().0 ).collect::<Vec<_>>();
-
-      Ok(Tensor::new(shape,
-         &nested_subtensor(self,&coords,depth,acc_offset)))
+      Ok(Tensor::new(coords.iter().filter(|rnge| rnge.size_hint() != (1,Some(1)) ).map(|rnge| rnge.size_hint().0 ).collect::<Vec<_>>(),
+         &nested_subtensor(self,&coords,0,0)))
    }
 
    pub fn zeros(dimensions: Vec<usize>) -> Self
