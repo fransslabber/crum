@@ -55,23 +55,27 @@ impl<T: Clone + Zero + Mul<Output = T> + Debug + Display> Mul for Tensor<T>
       assert!(self.shape.last() == rhs.shape.first());
 
 
-      fn rh_nested_single_row<T: Clone + Debug>( t: &Tensor<T>, depth: usize, acc_offset: usize, ) -> Vec<T> {         
-         let rnge = 0..t.shape[depth];
-         if depth < t.shape.len()-2 {
-               rnge.clone().into_iter().map( |idx| rh_nested_single_row(t, depth + 1 , acc_offset + idx.clone() * t.strides[depth])).flatten().collect::<Vec<T>>()
-            } else {
-               //println!("rnge {:?}",rnge);
-               let single_row = (0..t.shape[depth]).map(|final_dim|    
+      // fn rh_nested_single_row<T: Clone + Debug>( t: &Tensor<T>, depth: usize, acc_offset: usize, ) -> Vec<T> {         
+      //    let rnge = 0..t.shape[depth];
+      //    if depth < t.shape.len()-2 {
+      //          rnge.clone().into_iter().map( |idx| rh_nested_single_row(t, depth + 1 , acc_offset + idx.clone() * t.strides[depth])).flatten().collect::<Vec<T>>()
+      //       } else {
+      //          //println!("rnge {:?}",rnge);
+      //          let single_row = (0..t.shape[depth]).map(|final_dim|    
                
-                              rnge.clone().into_iter()
-                              .map(|dim_n_1|  (0..t.shape[depth+1]).clone().into_iter().skip(final_dim).step_by(t.shape[depth]).map(|dim_n| (t.data[dim_n + acc_offset + dim_n_1 * t.strides[depth]]).clone() ).collect::<Vec<T>>() ).flatten().collect::<Vec<T>>()
-               ).flatten().collect();
-               //println!("rhs {:?}",single_row);
-               single_row
-            }
-      }
-      let rh = rh_nested_single_row(&rhs,0,0);
-      //println!("rh {:?}", rh);
+      //                         rnge.clone().into_iter()
+      //                         .map(|dim_n_1|  (0..t.shape[depth+1]).clone().into_iter().skip(final_dim).step_by(t.shape[depth]).map(|dim_n| (t.data[dim_n + acc_offset + dim_n_1 * t.strides[depth]]).clone() ).collect::<Vec<T>>() ).flatten().collect::<Vec<T>>()
+      //          ).flatten().collect();
+      //          println!("rhs {:?}",single_row);
+      //          single_row
+      //       }
+      // }
+      // let rh = rh_nested_single_row(&rhs,0,0);
+      let common_dim = self.shape[self.shape.len()-1];
+      let stride = rhs.strides[0];
+      let rh:Vec<T> =   (0..stride).into_iter().map(|dim| rhs.data.iter().skip(dim).step_by(stride).map(|elem| elem.clone() ).collect::<Vec<T>>() ).flatten().collect();
+
+      println!("rh {:?}", rh);
       // LHS initial ranges
       //let lhs_len = self.shape.len();
       //let mut lhs_ranges:Vec<RangeInclusive<usize>> = self.shape.iter().take(lhs_len - 1).map(|_| (0..=0) ).collect();
@@ -90,7 +94,10 @@ impl<T: Clone + Zero + Mul<Output = T> + Debug + Display> Mul for Tensor<T>
       // let lh = lh_nested_single_row(&self,0,0);
       // println!("{:?}",lh);
 
-      let c:Vec<T> = self.data.chunks(2).map( |lh| rh.chunks(2).map(|rh|  lh.iter().zip(rh.iter()).fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()) )).flatten().collect();
+      
+      let c:Vec<T> = self.data.chunks(common_dim)
+                                 .map( |lh| rh.chunks(common_dim)
+                                    .map(|rh|  lh.iter().zip(rh.iter()).inspect(|(l,r)| println!("{} * {}",l,r)).fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()) )).flatten().collect();
       //println!("{:?}",c);
       //let new_elem = rh.chunks(2).zip(rnge.clone().into_iter()).
 
