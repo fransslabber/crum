@@ -13,6 +13,7 @@ homepage = "http://www.gaiamathematica.net"
 authors = ["Frans Slabber <frans@gaiamathematica.net>"]
 
 [dependencies]
+ndarray = "0.16.1"
 num-traits = "0.2.19"
 rand = "0.8"
 tensor_macro = { path = "tensor_macro" }
