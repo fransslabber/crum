@@ -76,6 +76,12 @@ impl<T: Clone + Zero + Mul<Output = T> + Debug + Display> Mul for Tensor<T>
    }
 }
 
+impl<T: PartialEq> PartialEq for Tensor<T>
+{
+   fn eq(&self, other: &Self) -> bool {
+      self.shape == other.shape && self.strides == other.strides && self.data == other.data
+   }
+}
 /// Implement display of a generic matrix; {}
 impl<T: Clone + Display> Display for Tensor<T>
 {
@@ -270,59 +276,54 @@ macro_rules! tensor {
 
 pub fn contract<T>(lh_idx: usize, lh_t: &Tensor<T>,rh_idx: usize, rh_t: &Tensor<T> ) -> Tensor<T>
 where
-   T: Clone + Zero + Mul<Output = T> + Debug + Display
+   T: Clone + Zero + Mul<Output = T> + Debug + Display + One
 {
-
-   fn dim_right_shift<T: Clone>(new_dim:usize,old_dim:usize,data: &Vec<T>) -> Vec<T> {
-      (0..new_dim).into_iter()
-                                    .map( |dim|  data.chunks(old_dim)
-                                    .skip(dim)
-                                    .step_by(new_dim)
-                                    .map(|chk| chk.to_vec()).flatten().collect::<Vec<_>>())
-                                    .flatten()
-                                    .collect()
-   }
-
-
    assert!(lh_t.shape[lh_idx] == rh_t.shape[rh_idx]);
 
    let common_dim = lh_t.shape[lh_idx];
-
-   let lstride = lh_t.strides[lh_idx];
-   let rstride = rh_t.strides[rh_idx];
-
-   let lh:Vec<T> =   (0..lstride).into_iter().map(|dim| lh_t.data.iter().skip(dim).step_by(lstride).map(|elem| elem.clone() ).collect::<Vec<T>>() ).flatten().collect();
-   let mut rh:Vec<T> = (0..rstride).into_iter().map(|dim| rh_t.data.iter().skip(dim).step_by(rstride).map(|elem| elem.clone() ).collect::<Vec<T>>() ).flatten().collect::<Vec<_>>();
-
-   // Shift both dimensions into correct positions
-   // resample rh -> dimension right shift
-   let mut shift_counter = rh_t.shape.len() - rh_idx - 1;
-   while shift_counter > 0 {
-      rh = dim_right_shift(rh_t.shape[shift_counter-1], rh_t.shape[shift_counter], &rh);
-      shift_counter -= 1;       
-   }
-   
-   //println!("lh {:?}", lh);
-   //println!("rh {:?}", rh); 
-      
-   let mut c:Vec<T> = lh.chunks(common_dim)
-                     .map( |ls| rh.chunks(common_dim)
-                     .map(|rs|  ls.iter().zip(rs.iter()).fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()) )).flatten().collect();
-
-   // resample c -> dimension
-   shift_counter = lh_t.shape.len() - lh_idx - 1;
-   while shift_counter > 0 {
-      c = dim_right_shift(lh_t.shape[shift_counter-1], lh_t.shape[shift_counter], &c);
-      shift_counter -= 1;       
-   }
-                  
-
    let mut lh_sh = lh_t.shape.clone();
    lh_sh.remove(lh_idx);
    let mut rh_sh = rh_t.shape.clone();
    rh_sh.remove(rh_idx);
+   //let combined_matrix: usize = rh_sh.iter().fold(1,|acc,x| acc * x);
    let newshape = lh_sh.iter().chain(rh_sh.iter()).cloned().collect();
-      
+
+   //let lstride = lh_t.strides[lh_idx];
+   //let rstride = rh_t.strides[rh_idx];
+
+   // Get flatpacked tensors for both sides with contracting dimension
+   fn flatpack<T: Clone + Debug + Display>(t: &Tensor<T>, target_dim: usize, depth: usize, acc_offset: usize ) -> Vec<T> {      
+      let rnge = 0..t.shape[depth];
+      if depth < target_dim {
+            //println!("deeper {depth} {:?}", rnge);
+            rnge.clone().into_iter().map( |dim_count| flatpack(t,target_dim, depth + 1,acc_offset + (dim_count.clone() * t.strides[depth]))).flatten().collect::<Vec<T>>()
+         } else {
+            //println!("return depth {depth} targt dim {target_dim} offset {acc_offset} {:?}", rnge );
+            let data_block:Vec<T> = t.data.iter().skip(acc_offset)
+                                          .take(t.strides[target_dim]*t.shape[target_dim]).map(|x| x.clone()).collect();
+            //println!("data_block {:?}", data_block);
+            let ret = (0..t.strides[target_dim]).into_iter().map(|os| data_block.iter()
+                                                                     .skip(os)
+                                                                     .step_by(t.strides[target_dim])
+                                                                     .map(|x| x.clone() ).collect::<Vec<T>>() ).flatten().collect();
+            //println!("{:?}",ret);
+            ret
+
+
+         }   
+   }
+
+   let lh = flatpack(lh_t,lh_idx,0,0);  
+   let rh = flatpack(rh_t,rh_idx,0,0);
+   //println!("lh {:?}", lh);
+   //println!("rh {:?}", rh);
+
+   
+   let c:Vec<T> = lh.chunks(common_dim)
+                     .map( |ls| rh.chunks(common_dim)
+                     .map(|rs|  ls.iter().zip(rs.iter()).fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()) )).flatten().collect();
+
+
    Tensor::new( newshape, &c)
    
    
@@ -338,7 +339,7 @@ where
 ///
 /// # Returns
 ///
-/// Matrices L(Lower Triangular),U(Upper Triangular),P(Permutation) and the number of rows swaps in the pivot process.
+/// 
 ///
 pub fn einsum<T,U>( equation: String, operands: U) -> Tensor<T> {
 
