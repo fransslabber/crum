@@ -279,17 +279,21 @@ macro_rules! tensor {
    };   
 }
 
-pub fn flatpack<T: Clone + Debug + Display>(t: &Tensor<T>, target_dim: usize, depth: usize, acc_offset: usize ) -> Vec<T> {      
+pub fn flatslice<T: Clone + Debug + Display>(t: &Tensor<T>, target_dim: usize, depth: usize, acc_offset: usize ) -> Vec<T> {      
    let rnge = 0..t.shape[depth];   
-   if depth < t.shape.len() - 1 - target_dim {
+   if depth < target_dim {
       //println!("deeper: depth {depth} {:?}", rnge);
-      rnge.clone().into_iter().map( |dim_count| flatpack(t,target_dim, depth + 1,acc_offset + (dim_count.clone() * (depth+1)))).flatten().collect::<Vec<T>>()
+      rnge.into_iter().map( |dim_count| flatslice(t,target_dim, depth + 1,acc_offset + (dim_count.clone() * t.strides[depth]))).flatten().collect::<Vec<T>>()
    } else {
-      //println!("return:  depth {depth} stride {} trgt dim {target_dim} offset {acc_offset} {:?}",t.strides[2 - depth], rnge );
-      let ret = t.data.iter()                                 
-                              .skip(acc_offset)
-                              .step_by(t.strides[t.shape.len() - 1 - depth])
-                              .map(|x| x.clone() ).collect::<Vec<T>>();
+      //println!("return:  depth {depth} stride {} trgt dim {target_dim} offset {acc_offset} {:?}",t.strides[depth], rnge );
+      let stride = t.strides[depth];
+      let ret = (0..stride).into_iter().map(|idx|                                          
+                                             t.data.iter()                                 
+                                             .skip(acc_offset + idx)
+                                             .step_by(stride)
+                                             .take(t.shape[depth])
+                                             .map(|x| x.clone() ).collect::<Vec<T>>()
+                                             ).flatten().collect::<Vec<_>>();
       
       //println!("return: fragment {:?}",ret);
       ret
@@ -303,105 +307,38 @@ where
    assert!(lh_idx.iter().zip(rh_idx.iter().rev()).all(|(&l,&r)| lh_t.shape[l] == rh_t.shape[r]) );
   // Build new shape
    let lh_sh:Vec<usize> = lh_t.shape.iter().enumerate().filter(|(offset,_)| lh_idx.contains(offset) == false ).map(|(_,x)| *x).collect();
-   let lh_cumulative_dim = lh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
-   println!("lh_sh {:?} {lh_cumulative_dim}",lh_sh);
+   //let lh_cumulative_dim = lh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
+   //println!("lh_sh {:?} {lh_cumulative_dim}",lh_sh);
    let rh_sh:Vec<usize> = rh_t.shape.iter().enumerate().filter(|(offset,_)| rh_idx.contains(offset) == false ).map(|(_,x): (usize, &usize)| *x).collect();
-   let rh_cumulative_dim = rh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
-   println!("rh_sh {:?} {rh_cumulative_dim}",rh_sh);
+   //let rh_cumulative_dim = rh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
+   //println!("rh_sh {:?} {rh_cumulative_dim}",rh_sh);
    let new_shape = lh_sh.iter().chain(rh_sh.iter()).cloned().collect();
+   let initial_contract_dim_size = lh_t.shape[*lh_idx.last().unwrap()];
 
    // Get flatpacked tensors for both sides with contracting dimension  
-   let lh = flatpack(lh_t,*lh_idx.last().unwrap(),0,0);  
-   let rh = flatpack(rh_t,*rh_idx.first().unwrap(),0,0);
-   println!("lh {:?}", lh);
-   println!("rh {:?}", rh);
+   let lh = flatslice(lh_t,*lh_idx.last().unwrap(),0,0);  
+   let rh = flatslice(rh_t,*rh_idx.first().unwrap(),0,0);
+   // println!("lh {:?} {}", lh, lh.len());
+   // println!("rh {:?} {}", rh, rh.len());
 
-   // form product via a recursive process
-   // fn prod_over_dim<T: Clone + Zero + Mul<Output = T> + Debug>(lh: &Vec<T>, lh_sh: &Vec<usize>, lh_depth: usize,
-   //                                                             rh: &Vec<T>, rh_sh: &Vec<usize>, rh_depth: usize ) -> Vec<T> {
-   //    if lh_depth < lh_sh.len()-1 {
-   //       prod_over_dim(lh,lh_sh, lh_depth + 1,rh,rh_sh,rh_depth + 1)
-   //    } else {
-   //       println!("{lh_depth} {rh_depth}");
-   //       let ret = lh.chunks(4)
-   //                            //.inspect(|r| println!("l {:?}",r))
-   //                            .map( |ls| 
-
-   //                               (0..4 as usize).into_iter().map(|idx| 
-   //                                  rh.chunks(4)
-   //                                  .skip(idx)
-   //                                  .step_by(4)
-   //                                  //.inspect(|r| println!("r {:?}",r))
-   //                                  .map(|rs|  ls.iter().zip(rs.iter()).fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()) )).flatten().collect::<Vec<_>>() 
-   //                               ).flatten().collect();
-   //       //println!(" Return {:?}", ret);
-   //       ret
-   //    }
-   // }
-
-     // form product via a recursive process
-   fn prod_over_dim<T: Clone + Zero + Mul<Output = T> + Debug>(lh: &[T], lh_cum_dim: usize,
-                                                                              rh: &[T], rh_cum_dim: usize ) -> [T] {
-
-      if true {                                                                                
-         (0..lh_cum_dim).into_iter().map(|idx|    
-      } else {
-
-         
-
-         lh.iter()
-         .zip(rh.iter())
-         .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone())
-
-         let ret = lh.chunks(lh_cum_dim)
-                                          //.inspect(|r| println!("l {:?}",r))
-                                          .map( |ls| 
-                                                
-                                                                     (0..3 as usize).into_iter().map(|idx2|  
-                                                                        rh.chunks(rh_cum_dim)
-                                                                        .skip(idx)
-                                                                        .step_by(rh_cum_dim)
-                                                                        //.inspect(|r| println!("r {:?}",r))
-                                                                        .map(|rs|  ls.iter()
-                                                                                             .zip(rs.iter())
-                                                                                             .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone()))
-                                                                     ).flatten().collect::<Vec<_>>()
-                                                               ).flatten().collect::<Vec<_>>() 
-                                          ).flatten().collect();         
-      }                                                                          
+   let c = lh.chunks(initial_contract_dim_size)
+                                                   //.inspect(|r| println!("lchunk {:?}",r))
+                                                   .map( | ls|
    
-      //println!(" Return {:?}", ret);
-      ret
-      
-   }
-   //   // form product via a recursive process
-   // fn prod_over_dim<T: Clone + Zero + Mul<Output = T> + Debug>(lh: &Vec<T>, lh_cum_dim: usize,
-   //                                                                            rh: &Vec<T>, rh_cum_dim: usize ) -> Vec<T> {
-    
-   //    let ret = lh.chunks(lh_cum_dim)
-   //                               //.inspect(|r| println!("l {:?}",r))
-   //                               .map( |ls| 
-   //                                     (0..lh_cum_dim).into_iter()
-   //                                                    .map(|idx| 
-   //                                                          rh.chunks(rh_cum_dim)
-   //                                                          .skip(idx)
-   //                                                          .step_by(rh_cum_dim)
-   //                                                          //.inspect(|r| println!("r {:?}",r))
-   //                                                          .map(|rs|  ls.iter()
-   //                                                                               .zip(rs.iter())
-   //                                                                               .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone())
-   //                                                          )
-   //                                                    ).flatten().collect::<Vec<_>>() 
-   //                               ).flatten().collect();
-   //    //println!(" Return {:?}", ret);
-   //    ret
-      
-   // }
-
-   let c:Vec<T> = prod_over_dim(&lh,5,&rh,5);
-   println!("c = {:?} len {}",c, c.len());
-
-   println!("{:?} {}",new_shape,c.len());
+                                                   // for each lh chunk dot with 
+                                                   rh.chunks(initial_contract_dim_size)
+                                                   //.skip(0)// + (idx_b3*2) + (idx_b4 ) )
+                                                   //.step_by(1)
+                                                   //.take(1)
+                                                   //.inspect(|r| println!("rchunk {:?} ",r))
+                                                   .map(|rs|  ls.iter()
+                                                                        .zip(rs.iter())
+                                                                        .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone())
+                                                   )
+                                                   //.inspect(|val| println!("{val}"))
+                                             ).flatten().collect::<Vec<_>>();         
+   //println!("c = {:?} len {}",c, c.len());
+   //println!("{:?} {}",new_shape,c.len());
 
    Tensor::new( new_shape, &c)
    //Tensor::new( vec![1],&vec![T::zero()])
