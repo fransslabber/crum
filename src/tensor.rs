@@ -1,11 +1,12 @@
 use std::any::Any;
 use std::fmt::{Debug, Display};
-use std::ops::{Add, Div, Index, IndexMut, Mul, Range, RangeInclusive, Sub};
+use std::ops::{Add, AddAssign, Div, Index, IndexMut, Mul, Range, RangeInclusive, Sub};
 use std::process::Output;
 use num_traits::{Float, NumCast, One, Signed, ToPrimitive, Zero};
 use rand::distributions::uniform::SampleUniform;
 use rand::Rng;
 use crate::tensor;
+use std::collections::HashMap;
 
 
 
@@ -244,7 +245,196 @@ impl<T: Clone> Tensor<T>
    pub fn data(&self) -> Vec<T>
    {
       self.data.clone()
-   }   
+   }
+
+   fn compute_strides(shape: &[usize]) -> Vec<usize> {
+      let mut strides = vec![1; shape.len()];
+      for i in (0..shape.len() - 1).rev() {
+          strides[i] = strides[i + 1] * shape[i + 1];
+      }
+      strides
+  }
+
+
+   pub fn contract(&self, other: &Self, einsum: &str) -> Self
+   where T: Mul<Output = T> + AddAssign + Default {
+      let (a_indices, b_indices, c_indices) = Self::parse_einsum(einsum);
+      let contracted_indices: Vec<char> = a_indices.iter()
+         .filter(|c| b_indices.contains(c))
+         .cloned()
+         .collect();
+
+      // Validate contracted dimensions match
+      for &idx in &contracted_indices {
+         let a_pos = a_indices.iter().position(|&c| c == idx).unwrap();
+         let b_pos = b_indices.iter().position(|&c| c == idx).unwrap();
+         assert_eq!(self.shape[a_pos], other.shape[b_pos], "Contracted dimension mismatch for index {}", idx);
+      }
+
+      // Compute output shape
+      let mut c_shape = Vec::new();
+      for &idx in &c_indices {
+         if a_indices.contains(&idx) {
+            let pos = a_indices.iter().position(|&c| c == idx).unwrap();
+            c_shape.push(self.shape[pos]);
+         } else {
+            let pos = b_indices.iter().position(|&c| c == idx).unwrap();
+            c_shape.push(other.shape[pos]);
+         }
+      }
+
+      // Precompute index mappings for A and B
+      let a_map: HashMap<_, _> = a_indices.iter().enumerate()
+         .map(|(i, &c)| (c, (i, self.strides[i])))
+         .collect();
+      let b_map: HashMap<_, _> = b_indices.iter().enumerate()
+         .map(|(i, &c)| (c, (i, other.strides[i])))
+         .collect();
+
+      // Compute strides for output tensor
+      let c_strides = Self::compute_strides(&c_shape);
+      let mut result_data = vec![T::default(); c_shape.iter().product()];
+
+      // Iterate over each element in the output tensor
+      for c_flat in 0..result_data.len() {
+          // Convert flat index to multi-dimensional indices for output
+         let c_indices_values = Self::flat_to_indices(c_flat, &c_strides, &c_shape);
+
+          // Calculate base offsets in A and B for non-contracted indices
+         let (a_base, b_base) = self.calculate_bases(&c_indices, &c_indices_values, &a_map, &b_map);
+
+          // Calculate sum over contracted indices
+         let sum = self.calculate_sum(a_base, b_base, &contracted_indices, &a_map, &b_map);
+
+         result_data[c_flat] = sum;
+      }
+
+      Tensor {
+         shape: c_shape,
+         strides: c_strides,
+         data: result_data,
+      }
+  }
+
+   pub fn parse_einsum(einsum: &str) -> (Vec<char>, Vec<char>, Vec<char>) {
+         let parts: Vec<&str> = einsum.split("->").collect();
+         let input_part = parts[0];
+         let output_part = if parts.len() > 1 { parts[1] } else { "" };
+
+         let inputs: Vec<&str> = input_part.split(',').collect();
+         let a_indices: Vec<char> = inputs[0].chars().collect();
+         let b_indices: Vec<char> = inputs[1].chars().collect();
+
+         // Infer output indices if not explicitly provided
+         let c_indices = if output_part.is_empty() {
+            let mut unique_indices = Vec::new();
+            for &c in &a_indices {
+               if !b_indices.contains(&c) {
+                     unique_indices.push(c);
+               }
+            }
+            for &c in &b_indices {
+               if !a_indices.contains(&c) && !unique_indices.contains(&c) {
+                     unique_indices.push(c);
+               }
+            }
+            unique_indices
+         } else {
+            output_part.chars().collect()
+         };
+
+         (a_indices, b_indices, c_indices)
+   }
+
+  fn flat_to_indices(flat: usize, strides: &[usize], shape: &[usize]) -> Vec<usize> {
+      let mut indices = vec![0; shape.len()];
+      let mut remaining = flat;
+      for (i, &stride) in strides.iter().enumerate() {
+          indices[i] = remaining / stride;
+          remaining %= stride;
+      }
+      indices
+  }
+
+  fn calculate_bases(
+      &self,
+      c_indices: &[char],
+      c_indices_values: &[usize],
+      a_map: &HashMap<char, (usize, usize)>,
+      b_map: &HashMap<char, (usize, usize)>,
+  ) -> (usize, usize) {
+      let mut a_base = 0;
+      let mut b_base = 0;
+      for (i, &idx) in c_indices.iter().enumerate() {
+          if let Some(&(pos, stride)) = a_map.get(&idx) {
+              a_base += c_indices_values[i] * stride;
+          }
+          if let Some(&(pos, stride)) = b_map.get(&idx) {
+              b_base += c_indices_values[i] * stride;
+          }
+      }
+      (a_base, b_base)
+  }
+
+  fn calculate_sum(
+      &self,
+      a_base: usize,
+      b_base: usize,
+      contracted_indices: &[char],
+      a_map: &HashMap<char, (usize, usize)>,
+      b_map: &HashMap<char, (usize, usize)>,
+  ) -> T
+  where T: Mul<Output = T> + AddAssign + Default{
+      let contracted_shapes: Vec<usize> = contracted_indices.iter()
+          .map(|&c| {
+              let (pos, _) = a_map[&c];
+              self.shape[pos]
+          })
+          .collect();
+      let total_contracted: usize = contracted_shapes.iter().product();
+      let mut sum = T::default();
+
+      for flat in 0..total_contracted {
+          let contracted_values = Self::flat_to_indices(flat, &Self::compute_strides(&contracted_shapes), &contracted_shapes);
+          let mut a_offset = a_base;
+          let mut b_offset = b_base;
+          for (i, &idx) in contracted_indices.iter().enumerate() {
+              let value = contracted_values[i];
+              let (_, a_stride) = a_map[&idx];
+              a_offset += value * a_stride;
+              let (_, b_stride) = b_map[&idx];
+              b_offset += value * b_stride;
+          }
+          sum += self.data[a_offset].clone() * self.data[b_offset].clone();
+      }
+
+      sum
+  }
+
+   /// Permutes(transposes) the dimensions of the tensor according to the given order.
+   pub fn transpose(&self, order: &[usize]) -> Self
+   where T: Default + Clone + Debug + Display{
+      let mut ret = Tensor::new(order.iter().map(|&i| self.shape[i]).collect(),
+         &vec![T::default(); self.data.len()] );
+
+      let mut current_index = vec![0 as usize;self.shape.len()];
+      
+      fn permute<T: Clone + Debug + Display>(t: &Tensor<T>, nt: &mut Tensor<T>, order: &[usize], current: &mut Vec<usize>, depth: usize  )
+      { 
+         if depth < t.shape.len() {
+            (0..t.shape[depth]).into_iter().for_each(|idx| {current[depth] = idx;  permute(t, nt, order, current, depth+1 )})
+         } else {
+
+            let old_offset = t.strides.iter().zip(current.iter()).fold(0,|acc,(x,y)|   acc + x * y);
+            let new_coord:Vec<usize> = order.iter().map(|c| current[*c] ).collect();
+            let new_offset = nt.strides.iter().zip(new_coord.iter()).fold(0,|acc,(x,y)|   acc + x * y);
+            nt.data[new_offset] = t.data[old_offset].clone();
+         }
+      }
+      permute(self, &mut ret,order, &mut current_index, 0);
+      ret      
+   }
+
 }
 
 /// Variadic tensor creation macro
@@ -300,92 +490,62 @@ pub fn flatslice<T: Clone + Debug + Display>(t: &Tensor<T>, target_dim: usize, d
    }   
 }
 
-pub fn contract<T>(lh_idx: Vec<usize>, lh_t: &Tensor<T>,rh_idx: Vec<usize>, rh_t: &Tensor<T> ) -> Tensor<T>
-where
-   T: Clone + Zero + Mul<Output = T> + Debug + Display + One
-{
-   assert!(lh_idx.iter().zip(rh_idx.iter().rev()).all(|(&l,&r)| lh_t.shape[l] == rh_t.shape[r]) );
-  // Build new shape
-   let lh_sh:Vec<usize> = lh_t.shape.iter().enumerate().filter(|(offset,_)| lh_idx.contains(offset) == false ).map(|(_,x)| *x).collect();
-   //let lh_cumulative_dim = lh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
-   //println!("lh_sh {:?} {lh_cumulative_dim}",lh_sh);
-   let rh_sh:Vec<usize> = rh_t.shape.iter().enumerate().filter(|(offset,_)| rh_idx.contains(offset) == false ).map(|(_,x): (usize, &usize)| *x).collect();
-   //let rh_cumulative_dim = rh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
-   //println!("rh_sh {:?} {rh_cumulative_dim}",rh_sh);
-   let new_shape = lh_sh.iter().chain(rh_sh.iter()).cloned().collect();
-   let initial_contract_dim_size = lh_t.shape[*lh_idx.last().unwrap()];
-
-   // Get flatpacked tensors for both sides with contracting dimension  
-   let lh = flatslice(lh_t,*lh_idx.last().unwrap(),0,0);  
-   let rh = flatslice(rh_t,*rh_idx.first().unwrap(),0,0);
-   // println!("lh {:?} {}", lh, lh.len());
-   // println!("rh {:?} {}", rh, rh.len());
-
-   let c = lh.chunks(initial_contract_dim_size)
-                                                   //.inspect(|r| println!("lchunk {:?}",r))
-                                                   .map( | ls|
-   
-                                                   // for each lh chunk dot with 
-                                                   rh.chunks(initial_contract_dim_size)
-                                                   //.skip(0)// + (idx_b3*2) + (idx_b4 ) )
-                                                   //.step_by(1)
-                                                   //.take(1)
-                                                   //.inspect(|r| println!("rchunk {:?} ",r))
-                                                   .map(|rs|  ls.iter()
-                                                                        .zip(rs.iter())
-                                                                        .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone())
-                                                   )
-                                                   //.inspect(|val| println!("{val}"))
-                                             ).flatten().collect::<Vec<_>>();         
-   //println!("c = {:?} len {}",c, c.len());
-   //println!("{:?} {}",new_shape,c.len());
-
-   Tensor::new( new_shape, &c)
-   //Tensor::new( vec![1],&vec![T::zero()])
-}
-
-/// Einsten's Tensor contraction notation implementation
-/// Should be a macro to consume string and operands ...
-/// # Arguments
-///
-/// * `equation` - Einstein's summation notation for tensor contraction.
-/// * `operands` - n-tuple of tensors.
-///
-/// # Returns
-///
-/// 
-///
-pub fn einsum<T,U>( equation: String, operands: U) -> Tensor<T> {
-
-   // Check if '->' and split equation on that.
-   let eqn_parts = equation.split("->");
-   if eqn_parts.count() == 1 {
-      // no rhs => straight contraction preserving index order
-
-
-   
-
-
-   } else {
-      // resultant ordering required
-
-
-
-   }
-   
-   for &byte in equation.as_bytes() {
+pub fn dotslice<T: Clone + Zero + Mul<Output = T> + Debug>(lh: &Vec<T>, rh: &Vec<T>,common_dim: Vec<usize> ) -> Vec<T> {
       
-      
-      
-      
-      println!("{}", byte as char); // Convert byte back to char
-   }
+      let rh_skip = vec![0,1];
+      let rh_step = vec![1,2];
+
+      // rearrange rh?
+      let mut rhext = rh.clone();
+      rhext.swap(2, 4);
+      rhext.swap(3, 5);
+
+
+      lh.chunks(4)
+         //.inspect(|r| println!("lchunk {:?}",r))
+         .map( | ls|
+
+            // for each lh chunk dot with 
+            rhext.chunks(4)
+            //.inspect(|r| println!("rchunk {:?} ",r))
+            .map(|rs|  ls.iter()
+                                 .zip(rs.iter())
+                                 .fold(T::zero(),|acc,(l,r)|  acc + l.clone() * r.clone())
+            )
+            //.inspect(|val| println!("{val}"))
+         )
+         .flatten()
+         .collect::<Vec<_>>()  
 
 
 
+} 
 
+// pub fn contract<T>(lh_idx: Vec<usize>, lh_t: &Tensor<T>,rh_idx: Vec<usize>, rh_t: &Tensor<T> ) -> Tensor<T>
+// where
+//    T: Clone + Zero + Mul<Output = T> + Debug + Display + One
+// {
+//    assert!(lh_idx.iter().zip(rh_idx.iter().rev()).all(|(&l,&r)| lh_t.shape[l] == rh_t.shape[r]) );
+//   // Build new shape
+//    let lh_sh:Vec<usize> = lh_t.shape.iter().enumerate().filter(|(offset,_)| lh_idx.contains(offset) == false ).map(|(_,x)| *x).collect();
+//    //let lh_cumulative_dim = lh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
+//    //println!("lh_sh {:?} {lh_cumulative_dim}",lh_sh);
+//    let rh_sh:Vec<usize> = rh_t.shape.iter().enumerate().filter(|(offset,_)| rh_idx.contains(offset) == false ).map(|(_,x): (usize, &usize)| *x).collect();
+//    //let rh_cumulative_dim = rh_sh.iter().fold(1 as usize,|acc,x| acc * *x);
+//    //println!("rh_sh {:?} {rh_cumulative_dim}",rh_sh);
+//    let new_shape = lh_sh.iter().chain(rh_sh.iter()).cloned().collect();
+//    //let initial_contract_dim_size = lh_t.shape[*lh_idx.last().unwrap()];
 
+//    // Get flatpacked tensors for both sides with contracting dimension  
+//    let lh = flatslice(lh_t,*lh_idx.last().unwrap(),0,0);  
+//    let rh = flatslice(rh_t,*rh_idx.first().unwrap(),0,0);
+//    println!("lh {:?} {}", lh, lh.len());
+//    println!("rh {:?} {}", rh, rh.len());
 
-   todo!()
-}
-   
+//    let c = dotslice(&lh, &rh, lh_idx.iter().map(|idx| lh_t.shape[*idx]).collect());
+//    //println!("{} {:?}",c.len(), c);
+
+//    Tensor::new( new_shape, &c)
+//    //Tensor::new( vec![1],&vec![T::zero()])
+// }
+
