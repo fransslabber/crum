@@ -247,6 +247,16 @@ impl<T: Clone> Tensor<T>
       self.data.clone()
    }
 
+   ///
+   /// Contraction
+   /// 
+
+
+
+
+
+
+
    fn compute_strides(shape: &[usize]) -> Vec<usize> {
       let mut strides = vec![1; shape.len()];
       for i in (0..shape.len() - 1).rev() {
@@ -412,6 +422,16 @@ impl<T: Clone> Tensor<T>
   }
 
    /// Permutes(transposes) the dimensions of the tensor according to the given order.
+   /// ```
+   /// use crum::tensor::Tensor;
+   /// use crum::tensor;
+   /// 
+   /// let a = Tensor::arange(vec![2, 2, 2], 1.0);
+   /// let at = a.transpose(&[2,1,0]);
+   /// let compare = tensor!([[[1.0, 5.0],[3.0, 7.0]],
+   ///                         [[2.0, 6.0],[4.0, 8.0]]]);
+   /// assert!(at == compare);
+   /// ```
    pub fn transpose(&self, order: &[usize]) -> Self
    where T: Default + Clone + Debug + Display{
       let mut ret = Tensor::new(order.iter().map(|&i| self.shape[i]).collect(),
