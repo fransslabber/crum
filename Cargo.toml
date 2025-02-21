@@ -1,19 +1,18 @@
 [package]
 name = "crum"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
-description = "Complex numbers and matrices for numerical analysis."
+description = "Tensors, Matrices and Complex numbers for numerical analysis."
 repository = "https://github.com/fransslabber/crum"
 readme = "README.md"
-keywords = ["complexnumbers", "complexmatrix","numericalanalysis","mathematics"]
+keywords = ["Tensor","complexnumbers", "complexmatrix","numericalanalysis","mathematics"]
 categories = ["mathematics", "science"]
 documentation = "https://docs.rs/crum/latest/crum/index.html"
 homepage = "http://www.gaiamathematica.net"
 authors = ["Frans Slabber <frans@gaiamathematica.net>"]
 
 [dependencies]
-ndarray = "0.16.1"
 num-traits = "0.2.19"
 rand = "0.8"
-tensor_macro = { path = "tensor_macro" }
+tensor_macro = { path = "tensor_macro", version = "0.1.0" }

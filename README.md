@@ -8,6 +8,11 @@ NB: This is an experimental in beta package, use at your own discretion. Some fu
  The repository owner accepts no responsibility nor liability for any consequences of the use of this package.
 
 # Features
+## Tensors
+- easy tensor creation macro
+- range based, random, zeroes, ones creation functions
+- multi-dimensional transpose ( as in Numpy )
+- Multi-dimensional contraction using Einstein's Summation Notation ( as per Numpy )
 ## Complex Numbers
 - num_traits Float and Num for generic complex number type Complex(incomplete)`<T>`
 - mimic std c++ `<complex>` functionality
