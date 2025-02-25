@@ -206,6 +206,30 @@ impl<T: Clone> Tensor<T>
       self.data.clone()
    }
 
+   pub fn tensordot(&self,rh: &Tensor<T>, axes: Vec<Vec<usize>>) -> Self 
+   where
+      T: Copy + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T> + Zero
+   {
+
+      let a_contract = &axes[0];
+      let b_contract = &axes[1];
+      let mut a_free = Vec::<usize>::new();
+      let mut b_free = Vec::<usize>::new();
+      
+      for a_axis in 0..self.shape.len(){
+         if !a_contract.contains(&a_axis) {
+            a_free.push(a_axis);
+         }
+      }
+      for b_axis in 0..rh.shape.len() {
+         if !b_contract.contains(&b_axis) {
+            b_free.push(b_axis);
+         }
+      }
+
+      self.contract(rh,&a_contract, &b_contract, &a_free, &b_free)
+   }
+
    ///
    /// Einstein's Summation Notation Contraction
    /// 
@@ -229,28 +253,57 @@ impl<T: Clone> Tensor<T>
       let parts: Vec<&str> = eqn.split("->").collect();
       let input_part = parts[0];
       let _output_part = if parts.len() > 1 { parts[1] } else { "" };
-      let inputs: Vec<&str> = input_part.split(',').collect(); 
+      let inputs: Vec<&str> = input_part.split(',').collect();
 
-      let (a_contract , b_contract , a_free , b_free) = einstein_indices(inputs[0], inputs[1]);
+      let mut a_contract = Vec::<usize>::new();
+      let mut b_contract = Vec::<usize>::new();
+      let mut a_free = Vec::<usize>::new();
+      let mut b_free = Vec::<usize>::new();
 
+      for (lh_idx,lh_char) in inputs[0].char_indices() {
+         for (rh_idx,rh_char) in inputs[1].char_indices() {
+            if lh_char == rh_char {
+               a_contract.push(lh_idx);
+               b_contract.push(rh_idx); 
+            }
+         }
+      }
+      for (lh_idx,_) in inputs[0].char_indices() {
+         if !a_contract.contains(&lh_idx) {
+            a_free.push(lh_idx);
+         }
+      }
+      for (rh_idx,_) in inputs[1].char_indices() {
+         if !b_contract.contains(&rh_idx) {
+            b_free.push(rh_idx);
+         }
+      }
+      self.contract(rht,&a_contract, &b_contract, &a_free, &b_free)
+   } 
 
+   fn contract(&self, rh: &Tensor<T>, a_contract: &Vec<usize> , b_contract: &Vec<usize> , a_free: &Vec<usize> , b_free: &Vec<usize> ) -> Self
+   where
+      T: Copy + Default + std::ops::Add<Output = T> + std::ops::Mul<Output = T> + Zero
+   {
       // println!("a_free {:?}",a_free);
       // println!("a_contract {:?}",a_contract);
       // println!("b_contract {:?}",b_contract);
-      // println!("b_free {:?}",b_free);   
+      // println!("b_free {:?}",b_free);
       
+      assert!( a_contract.iter().zip(b_contract.iter()).all(|(a,b)| self.shape[*a] == rh.shape[*b] ) );
+
       // Permute tensors
       let a_full:Vec<usize> = a_free.iter().chain(a_contract.iter()).map(|x| *x).collect();
       //println!("a_full {:?}",a_full);
       let a_trans = self.transpose(&a_full); // Move contract_a to end
       let b_full:Vec<usize> = b_contract.iter().chain(b_free.iter()).map(|x| *x).collect();
       //println!("b_full {:?}",b_full);
-      let b_trans = rht.transpose(&b_full); // Move contract_b to start
+      let b_trans = rh.transpose(&b_full); // Move contract_b to start
       
       // Compute sizes
       let free_a_size = a_free.iter().map(|&i| self.shape[i]).product::<usize>();
       let contract_size = a_contract.iter().map(|&i| self.shape[i]).product::<usize>();
-      let free_b_size = b_free.iter().map(|&i| rht.shape[i]).product::<usize>();
+      let free_b_size = b_free.iter().map(|&i| rh.shape[i]).product::<usize>();
       
       // Reshape
       let a_reshaped = a_trans.reshape(vec![free_a_size, contract_size]);
@@ -260,16 +313,16 @@ impl<T: Clone> Tensor<T>
       // println!("{}",b_reshaped);
 
       // Matrix multiplication
-      let c = Tensor::matrix_mul(&a_reshaped,&b_reshaped);
+      let c = Tensor::matmul(&a_reshaped,&b_reshaped);
       
       // Reshape to final shape
       let mut c_shape = a_free.iter().map(|&i| self.shape[i]).collect::<Vec<_>>();
-      c_shape.extend(b_free.iter().map(|&i| rht.shape[i]));
+      c_shape.extend(b_free.iter().map(|&i| rh.shape[i]));
       c.reshape(c_shape)
    }
 
    /// Matrix multiplication
-   fn matrix_mul(lh: &Self,rh: &Self) -> Self 
+   pub fn matmul(lh: &Self,rh: &Self) -> Self 
    where T: Default + Zero + Mul<Output = T> {
  
       let rht = rh.transpose(&[1,0]);
@@ -354,35 +407,4 @@ macro_rules! tensor {
          crum::tensor::Tensor::new(d,&t)
       }  
    };   
-}
-
-/// Contraction helper function : there may be a neater way to do this?
-fn einstein_indices(lh: &str, rh: &str) -> (Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>) {
-
-   let mut a_contract = Vec::<usize>::new();
-   let mut b_contract = Vec::<usize>::new();
-   let mut a_free = Vec::<usize>::new();
-   let mut b_free = Vec::<usize>::new();
-
-   for (lh_idx,lh_char) in lh.char_indices() {
-      for (rh_idx,rh_char) in rh.char_indices() {
-         if lh_char == rh_char {
-            a_contract.push(lh_idx);
-            b_contract.push(rh_idx); 
-         }
-      }
-   }
-   for (lh_idx,_) in lh.char_indices() {
-      if !a_contract.contains(&lh_idx) {
-         a_free.push(lh_idx);
-      }
-   }
-   for (rh_idx,_) in rh.char_indices() {
-      if !b_contract.contains(&rh_idx) {
-         b_free.push(rh_idx);
-      }
-   }
-
-   (a_contract , b_contract , a_free , b_free)
-
 }

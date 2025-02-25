@@ -9,6 +9,9 @@ fn main() -> std::io::Result<()> {
    let b = Tensor::arange(vec![5, 4, 3, 2], 1.0);
    let c = a.einsum(&b, "ijkl,mkni");
    println!("c  {}", c);
+
+   let d = a.tensordot(&b, vec![[0,2].to_vec(),[3,1].to_vec()]);
+   println!("d  {}", d);
  
    let mut file = File::create("output.txt")?;
    let formatted_text = format!("{c}");
